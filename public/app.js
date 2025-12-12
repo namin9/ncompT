@@ -1,197 +1,212 @@
-const API_BASE_URL = 'https://young-sunset-d631.koolee1372.workers.dev';
+/* =========================================================
+   Service Homepage – App Engine
+   역할:
+   - 콘텐츠 JSON을 받아 섹션 템플릿으로 렌더링
+   - 미리보기 메시지(PREVIEW) 수신
+   - 이미지 없는 상태에서도 레이아웃 유지
+========================================================= */
+
+const API_BASE =
+  'https://young-sunset-d631.koolee1372.workers.dev';
 
 /* ===============================
-   Entry
+   Navigation
 ================================ */
-fetch(API_BASE_URL + '/api/content')
-  .then(res => res.json())
-  .then(data => {
-    renderHeader(data.navigation || []);
-    renderSections(data.sections || []);
-  })
-  .catch(err => {
-    console.error('Content load failed:', err);
-  });
+function renderNavigation(nav = []) {
+  const navEl = document.getElementById('nav');
+  if (!navEl) return;
 
-/* ===============================
-   Header
-================================ */
-function renderHeader(navigation) {
-  const header = document.getElementById('header');
-  if (!header) return;
+  navEl.innerHTML = nav
+    .filter(n => n.enabled)
+    .map(n => `
+      <li>
+        <a href="#${n.target}">${n.label}</a>
+      </li>
+    `)
+    .join('');
 
-  header.innerHTML = `
-    <nav>
-      <ul>
-        ${navigation
-          .filter(n => n.enabled)
-          .map(n => `
-            <li>
-              <a href="#${n.target}" data-target="${n.target}">
-                ${n.label}
-              </a>
-            </li>
-          `)
-          .join('')}
-      </ul>
-    </nav>
-  `;
-
-  header.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', e => {
+  // 부드러운 스크롤
+  navEl.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', e => {
       e.preventDefault();
-      const target = link.dataset.target;
-      document.getElementById(target)
-        ?.scrollIntoView({ behavior: 'smooth' });
+      const id = a.getAttribute('href').replace('#','');
+      document.getElementById(id)?.scrollIntoView({
+        behavior: 'smooth'
+      });
     });
   });
 }
 
 /* ===============================
-   Sections
+   Media Placeholder
 ================================ */
-function renderSections(sections) {
-  const app = document.getElementById('app');
-  app.innerHTML = '';
-
-  sections
-    .filter(s => s.enabled)
-    .sort((a, b) => a.order - b.order)
-    .forEach(section => {
-      const el = document.createElement('section');
-      el.className = 'section';
-      el.id = section.id;
-
-      switch (section.type) {
-        case 'hero':
-          el.innerHTML = `
-            <h1>${section.content?.title || ''}</h1>
-            <p>${section.content?.subtitle || ''}</p>
-          `;
-          break;
-
-        case 'service':
-          el.innerHTML = `
-            <h2>${section.content?.title || ''}</h2>
-            <ul>
-              ${(section.content?.items || [])
-                .map(i => `<li>${i}</li>`)
-                .join('')}
-            </ul>
-          `;
-          break;
-
-        case 'cta':
-          el.innerHTML = `
-            <h2>${section.content?.title || ''}</h2>
-            ${section.variant === 'secondary'
-              ? `<p class="sub">보조 CTA</p>`
-              : `<button>문의하기</button>`}
-          `;
-          break;
-
-        /* ✅ fallback */
-        default:
-          console.warn('Fallback render:', section.type);
-          el.innerHTML = `
-            <h2>${section.content?.title || '섹션'}</h2>
-            <p>${section.content?.text || ''}</p>
-          `;
-      }
-
-      app.appendChild(el);
-    });
+function renderMedia(media = {}) {
+  const ratio = media.ratio || '16-9';
+  return `
+    <div class="media-box ratio-${ratio}"></div>
+  `;
 }
 
 /* ===============================
    Section Templates
 ================================ */
-function renderHero(section) {
-  const { title, subtitle } = section.content || {};
-  return `
-    <h1>${title || ''}</h1>
-    <p>${subtitle || ''}</p>
-  `;
-}
+function renderSection(section) {
+  switch (section.type) {
+    case 'hero':
+      return `
+        <section class="section hero" id="${section.id}">
+          <div class="section-inner">
+            ${renderMedia(section.media)}
+            <h1>${section.content?.title || ''}</h1>
+            <p>${section.content?.subtitle || ''}</p>
+          </div>
+        </section>
+      `;
 
-function renderService(section) {
-  const { title, cards = [] } = section.content || {};
-  const layout = section.options?.layout || 'grid';
+    case 'cards':
+      return `
+        <section class="section" id="${section.id}">
+          <div class="section-inner">
+            <h2>${section.content?.title || ''}</h2>
+            <div class="card-grid">
+              ${(section.content?.items || []).map(item => `
+                <div class="card">
+                  ${renderMedia(section.media)}
+                  <h3>${item.title || ''}</h3>
+                  <p>${item.desc || ''}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </section>
+      `;
 
-  if (layout === 'slider') {
-    return renderServiceSlider(title, cards, section.options?.slider);
+    case 'list':
+      return `
+        <section class="section" id="${section.id}">
+          <div class="section-inner">
+            <h2>${section.content?.title || ''}</h2>
+            <ul class="feature-list">
+              ${(section.content?.items || [])
+                .map(i => `<li>${i}</li>`)
+                .join('')}
+            </ul>
+          </div>
+        </section>
+      `;
+
+    case 'cta':
+      return `
+        <section class="section" id="${section.id}">
+          <div class="section-inner">
+            <div class="cta-box">
+              <h2>${section.content?.title || ''}</h2>
+              <p>${section.content?.subtitle || ''}</p>
+              <button>문의하기</button>
+            </div>
+          </div>
+        </section>
+      `;
+
+    case 'gallery':
+      return `
+        <section class="section" id="${section.id}">
+          <div class="section-inner">
+            <h2>${section.content?.title || ''}</h2>
+            <div class="card-grid">
+              ${(section.content?.items || []).map(() => `
+                <div class="media-box ratio-${section.media?.ratio || '1-1'}"></div>
+              `).join('')}
+            </div>
+          </div>
+        </section>
+      `;
+
+    case 'faq':
+      return `
+        <section class="section" id="${section.id}">
+          <div class="section-inner">
+            <h2>${section.content?.title || ''}</h2>
+            ${(section.content?.items || []).map(f => `
+              <div class="card">
+                <strong>${f.q || ''}</strong>
+                <p>${f.a || ''}</p>
+              </div>
+            `).join('')}
+          </div>
+        </section>
+      `;
+
+    case 'pricing':
+      return `
+        <section class="section" id="${section.id}">
+          <div class="section-inner">
+            <h2>${section.content?.title || ''}</h2>
+            <div class="card-grid">
+              ${(section.content?.items || []).map(p => `
+                <div class="card">
+                  <h3>${p.name || ''}</h3>
+                  <strong>${p.price || ''}</strong>
+                  <p>${p.desc || ''}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </section>
+      `;
+
+    default:
+      console.warn('Unknown section type:', section.type);
+      return '';
   }
-
-  // default: grid
-  return `
-    <h2>${title || ''}</h2>
-    <div class="card-grid">
-      ${cards
-        .filter(c => c.enabled)
-        .map(card => `
-          <div class="card">
-            <h3>${card.title || ''}</h3>
-            <p>${card.desc || ''}</p>
-          </div>
-        `)
-        .join('')}
-    </div>
-  `;
-}
-
-function renderServiceSlider(title, cards, sliderOptions = {}) {
-  const interval = sliderOptions.interval || 4000;
-  const id = 'slider-' + Math.random().toString(36).slice(2);
-
-  setTimeout(() => initSlider(id, interval), 0);
-
-  return `
-    <h2>${title || ''}</h2>
-    <div class="card-slider" id="${id}">
-      ${cards
-        .filter(c => c.enabled)
-        .map(card => `
-          <div class="card slide">
-            <h3>${card.title || ''}</h3>
-            <p>${card.desc || ''}</p>
-          </div>
-        `)
-        .join('')}
-    </div>
-  `;
-}
-
-function renderCTA(section) {
-  const { title } = section.content || {};
-  return `
-    <h2>${title || ''}</h2>
-  `;
 }
 
 /* ===============================
-   Slider Logic (simple)
+   Render Pipeline
 ================================ */
-function initSlider(containerId, interval) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
+function renderPage(data) {
+  if (!data) return;
 
-  const slides = Array.from(container.children);
-  if (slides.length === 0) return;
+  renderNavigation(data.navigation || []);
 
-  let index = 0;
-  slides.forEach((s, i) => {
-    s.style.display = i === 0 ? 'block' : 'none';
-  });
+  const app = document.getElementById('app');
+  if (!app) return;
 
-  setInterval(() => {
-    slides[index].style.display = 'none';
-    index = (index + 1) % slides.length;
-    slides[index].style.display = 'block';
-  }, interval);
+  app.innerHTML = '';
+
+  (data.sections || [])
+    .filter(s => s.enabled)
+    .sort((a,b) => a.order - b.order)
+    .forEach(section => {
+      app.insertAdjacentHTML(
+        'beforeend',
+        renderSection(section)
+      );
+    });
 }
 
-/* 🔄 외부에서 호출 가능 */
-window.reloadContent = loadContent;
+/* ===============================
+   Load Content (Initial)
+================================ */
+function loadContent() {
+  fetch(API_BASE + '/api/content')
+    .then(res => res.json())
+    .then(data => renderPage(data))
+    .catch(err => {
+      console.error('Content load failed:', err);
+    });
+}
 
-/* 초기 로드 */
-loadContent();
+/* ===============================
+   Preview Message Listener
+================================ */
+window.addEventListener('message', e => {
+  if (e.data?.type === 'PREVIEW') {
+    renderPage(e.data.data);
+  }
+});
+
+/* ===============================
+   Init
+================================ */
+document.addEventListener('DOMContentLoaded', loadContent);
