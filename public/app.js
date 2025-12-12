@@ -9,9 +9,7 @@ fetch(API_URL)
     renderHeader(data.navigation || []);
     renderSections(data.sections || []);
   })
-  .catch(err => {
-    console.error('Content load failed:', err);
-  });
+  .catch(err => console.error(err));
 
 /* ===============================
    Header
@@ -23,108 +21,120 @@ function renderHeader(navigation) {
   header.innerHTML = `
     <nav>
       <ul>
-        ${navigation
-          .filter(n => n.enabled)
-          .map(n => `
-            <li>
-              <a href="#${n.target}" data-target="${n.target}">
-                ${n.label}
-              </a>
-            </li>
-          `)
-          .join('')}
+        ${navigation.filter(n => n.enabled).map(n => `
+          <li>
+            <a href="#${n.target}" data-target="${n.target}">
+              ${n.label}
+            </a>
+          </li>
+        `).join('')}
       </ul>
     </nav>
   `;
 
-  header.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', e => {
+  header.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', e => {
       e.preventDefault();
-      const target = link.dataset.target;
-      document.getElementById(target)
+      document.getElementById(a.dataset.target)
         ?.scrollIntoView({ behavior: 'smooth' });
     });
   });
 }
 
 /* ===============================
-   Sections Renderer
+   Sections
 ================================ */
 function renderSections(sections) {
   const app = document.getElementById('app');
-  if (!app) return;
-
   app.innerHTML = '';
 
   sections
     .filter(s => s.enabled)
     .sort((a, b) => a.order - b.order)
     .forEach(section => {
-      const el = renderSection(section);
-      if (el) app.appendChild(el);
+      const el = document.createElement('section');
+      el.id = section.id;
+      el.className = `section section-${section.type}`;
+
+      if (section.type === 'hero') {
+        el.innerHTML = `
+          <h1>${section.content?.title || ''}</h1>
+          <p>${section.content?.subtitle || ''}</p>
+        `;
+      }
+
+      if (section.type === 'service') {
+        el.appendChild(renderService(section));
+      }
+
+      if (section.type === 'cta') {
+        el.innerHTML = `<h2>${section.content?.title || ''}</h2>`;
+      }
+
+      app.appendChild(el);
     });
 }
 
-function renderSection(section) {
-  const el = document.createElement('section');
-  el.id = section.id;
-  el.className = `section section-${section.type}`;
+/* ===============================
+   Service Renderer (Grid / Slider)
+================================ */
+function renderService(section) {
+  const wrapper = document.createElement('div');
+  const { title, cards = [] } = section.content || {};
+  const options = section.options || {};
+  const isSlider = options.layout === 'slider' || options.slider?.enabled;
 
-  switch (section.type) {
-    case 'hero':
-      el.innerHTML = renderHero(section);
-      break;
+  wrapper.innerHTML = `<h2>${title || ''}</h2>`;
 
-    case 'service':
-      el.innerHTML = renderService(section);
-      break;
+  const activeCards = cards.filter(c => c.enabled);
 
-    case 'cta':
-      el.innerHTML = renderCTA(section);
-      break;
+  if (!isSlider) {
+    // GRID
+    const grid = document.createElement('div');
+    grid.className = 'card-grid';
 
-    default:
-      console.warn('Unknown section type:', section.type);
-      return null;
+    grid.innerHTML = activeCards.map(c => `
+      <div class="card">
+        <h3>${c.title}</h3>
+        <p>${c.desc}</p>
+      </div>
+    `).join('');
+
+    wrapper.appendChild(grid);
+    return wrapper;
   }
 
-  return el;
+  // SLIDER
+  const slider = document.createElement('div');
+  slider.className = 'card-slider';
+
+  activeCards.forEach((c, idx) => {
+    const slide = document.createElement('div');
+    slide.className = 'card slide';
+    slide.style.display = idx === 0 ? 'block' : 'none';
+    slide.innerHTML = `<h3>${c.title}</h3><p>${c.desc}</p>`;
+    slider.appendChild(slide);
+  });
+
+  wrapper.appendChild(slider);
+
+  initSlider(slider, options.slider || {});
+  return wrapper;
 }
 
 /* ===============================
-   Section Templates
+   Simple Slider Logic
 ================================ */
-function renderHero(section) {
-  const { title, subtitle } = section.content || {};
-  return `
-    <h1>${title || ''}</h1>
-    <p>${subtitle || ''}</p>
-  `;
-}
+function initSlider(sliderEl, sliderOptions) {
+  const slides = sliderEl.querySelectorAll('.slide');
+  if (slides.length <= 1) return;
 
-/* --- 카드형 섹션 표준 --- */
-function renderService(section) {
-  const { title, cards = [] } = section.content || {};
+  let index = 0;
+  const interval = sliderOptions.interval || 4000;
 
-  return `
-    <h2>${title || ''}</h2>
-    <div class="card-grid">
-      ${cards
-        .filter(card => card.enabled)
-        .map(card => `
-          <div class="card">
-            <h3>${card.title || ''}</h3>
-            <p>${card.desc || ''}</p>
-          </div>
-        `)
-        .join('')}
-    </div>
-  `;
-}
-
-function renderCTA(section) {
-  const { title } = section.content || {};
-  return `
-    <h2>${title || ''}</h2>
-  `;
+  setInterval(() => {
+    slides[index].style.display = 'none';
+    index = (index + 1) % slides.length;
+    slides[index].style.display = 'block';
+  }, interval);
 }
