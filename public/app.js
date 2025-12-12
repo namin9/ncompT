@@ -18,6 +18,14 @@ fetch('/content.json')
           `;
         }
 
+        if (section.type === 'service') {
+          el.innerHTML = `
+            <h2>${section.content.title}</h2>
+            <ul>
+              ${section.content.items.map(i => `<li>${i}</li>`).join('')}
+            </ul>
+          `;
+        }
         app.appendChild(el);
       });
   });
