@@ -1,13 +1,18 @@
 /* =========================================================
-   Service Homepage – App Engine
+   Service Homepage – App Engine (CANONICAL)
    역할:
-   - 콘텐츠 JSON을 받아 섹션 템플릿으로 렌더링
-   - 미리보기 메시지(PREVIEW) 수신
+   - 콘텐츠 JSON 단일 상태 관리
+   - 섹션 타입별 렌더링
    - 이미지 없는 상태에서도 레이아웃 유지
+   - 관리자 미리보기(PREVIEW) 즉시 반영
 ========================================================= */
 
-const API_BASE =
-  'https://young-sunset-d631.koolee1372.workers.dev';
+const API_BASE = 'https://young-sunset-d631.koolee1372.workers.dev';
+
+/* ===============================
+   Global State (단 하나)
+================================ */
+let PAGE_DATA = null;
 
 /* ===============================
    Navigation
@@ -25,11 +30,10 @@ function renderNavigation(nav = []) {
     `)
     .join('');
 
-  // 부드러운 스크롤
   navEl.querySelectorAll('a').forEach(a => {
     a.addEventListener('click', e => {
       e.preventDefault();
-      const id = a.getAttribute('href').replace('#','');
+      const id = a.getAttribute('href').replace('#', '');
       document.getElementById(id)?.scrollIntoView({
         behavior: 'smooth'
       });
@@ -38,17 +42,24 @@ function renderNavigation(nav = []) {
 }
 
 /* ===============================
-   Media Placeholder
+   Media (Image / Placeholder)
 ================================ */
 function renderMedia(media = {}) {
   const ratio = media.ratio || '16-9';
-  return `
-    <div class="media-box ratio-${ratio}"></div>
-  `;
+
+  if (media.url) {
+    return `
+      <div class="media-box ratio-${ratio}">
+        <img src="${media.url}" alt="" />
+      </div>
+    `;
+  }
+
+  return `<div class="media-box ratio-${ratio}"></div>`;
 }
 
 /* ===============================
-   Section Templates
+   Section Renderer (단일 책임)
 ================================ */
 function renderSection(section) {
   switch (section.type) {
@@ -102,7 +113,7 @@ function renderSection(section) {
             <div class="cta-box">
               <h2>${section.content?.title || ''}</h2>
               <p>${section.content?.subtitle || ''}</p>
-              <button>문의하기</button>
+              <button>${section.content?.button || '문의하기'}</button>
             </div>
           </div>
         </section>
@@ -162,21 +173,21 @@ function renderSection(section) {
 }
 
 /* ===============================
-   Render Pipeline
+   Render Page (단일 파이프라인)
 ================================ */
-function renderPage(data) {
-  if (!data) return;
+function render() {
+  if (!PAGE_DATA) return;
 
-  renderNavigation(data.navigation || []);
+  renderNavigation(PAGE_DATA.navigation || []);
 
   const app = document.getElementById('app');
   if (!app) return;
 
   app.innerHTML = '';
 
-  (data.sections || [])
+  (PAGE_DATA.sections || [])
     .filter(s => s.enabled)
-    .sort((a,b) => a.order - b.order)
+    .sort((a, b) => a.order - b.order)
     .forEach(section => {
       app.insertAdjacentHTML(
         'beforeend',
@@ -191,18 +202,22 @@ function renderPage(data) {
 function loadContent() {
   fetch(API_BASE + '/api/content')
     .then(res => res.json())
-    .then(data => renderPage(data))
+    .then(data => {
+      PAGE_DATA = data;
+      render();
+    })
     .catch(err => {
       console.error('Content load failed:', err);
     });
 }
 
 /* ===============================
-   Preview Message Listener
+   Preview Listener (Admin → App)
 ================================ */
 window.addEventListener('message', e => {
   if (e.data?.type === 'PREVIEW') {
-    renderPage(e.data.data);
+    PAGE_DATA = e.data.data;
+    render();
   }
 });
 
