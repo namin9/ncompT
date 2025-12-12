@@ -52,43 +52,55 @@ function renderHeader(navigation) {
 ================================ */
 function renderSections(sections) {
   const app = document.getElementById('app');
-  if (!app) return;
-
   app.innerHTML = '';
 
   sections
     .filter(s => s.enabled)
     .sort((a, b) => a.order - b.order)
     .forEach(section => {
-      const el = renderSection(section);
-      if (el) app.appendChild(el);
+      const el = document.createElement('section');
+      el.className = 'section';
+      el.id = section.id;
+
+      switch (section.type) {
+        case 'hero':
+          el.innerHTML = `
+            <h1>${section.content?.title || ''}</h1>
+            <p>${section.content?.subtitle || ''}</p>
+          `;
+          break;
+
+        case 'service':
+          el.innerHTML = `
+            <h2>${section.content?.title || ''}</h2>
+            <ul>
+              ${(section.content?.items || [])
+                .map(i => `<li>${i}</li>`)
+                .join('')}
+            </ul>
+          `;
+          break;
+
+        case 'cta':
+          el.innerHTML = `
+            <h2>${section.content?.title || ''}</h2>
+            ${section.variant === 'secondary'
+              ? `<p class="sub">보조 CTA</p>`
+              : `<button>문의하기</button>`}
+          `;
+          break;
+
+        /* ✅ fallback */
+        default:
+          console.warn('Fallback render:', section.type);
+          el.innerHTML = `
+            <h2>${section.content?.title || '섹션'}</h2>
+            <p>${section.content?.text || ''}</p>
+          `;
+      }
+
+      app.appendChild(el);
     });
-}
-
-function renderSection(section) {
-  const el = document.createElement('section');
-  el.id = section.id;
-  el.className = `section section-${section.type}`;
-
-  switch (section.type) {
-    case 'hero':
-      el.innerHTML = renderHero(section);
-      break;
-
-    case 'service':
-      el.innerHTML = renderService(section);
-      break;
-
-    case 'cta':
-      el.innerHTML = renderCTA(section);
-      break;
-
-    default:
-      console.warn('Unknown section type:', section.type);
-      return null;
-  }
-
-  return el;
 }
 
 /* ===============================
@@ -177,3 +189,9 @@ function initSlider(containerId, interval) {
     slides[index].style.display = 'block';
   }, interval);
 }
+
+/* 🔄 외부에서 호출 가능 */
+window.reloadContent = loadContent;
+
+/* 초기 로드 */
+loadContent();
