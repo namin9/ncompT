@@ -2,35 +2,236 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>Admin</title>
+  <title>Homepage Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
     body {
-      font-family: system-ui, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f6f8;
+      margin: 0;
       padding: 24px;
-      background: #f7f7f7;
     }
-    pre {
+
+    h1 {
+      margin-top: 0;
+    }
+
+    button {
+      padding: 8px 14px;
+      margin-right: 6px;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    button.primary {
       background: #111;
-      color: #0f0;
-      padding: 16px;
-      overflow: auto;
+      color: #fff;
+      border-color: #111;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    hr {
+      margin: 20px 0;
+    }
+
+    .section-box {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .section-box strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea {
+      width: 100%;
+      padding: 6px;
+      box-sizing: border-box;
+      margin-top: 4px;
+    }
+
+    textarea {
+      height: 420px;
+      font-family: monospace;
+    }
+
+    label {
+      display: block;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    #status {
+      margin-top: 12px;
+      white-space: pre-wrap;
+      font-size: 14px;
+    }
+
+    .hidden {
+      display: none;
     }
   </style>
 </head>
 <body>
 
   <h1>Homepage Admin</h1>
-  <p>현재 KV에 저장된 콘텐츠</p>
 
-  <pre id="output">Loading...</pre>
+  <div>
+    <button onclick="showTab('form')">폼 편집</button>
+    <button onclick="showTab('raw')">JSON 편집</button>
+    <button class="primary" onclick="save()">저장</button>
+  </div>
+
+  <hr />
+
+  <div id="formTab"></div>
+  <div id="rawTab" class="hidden"></div>
+
+  <pre id="status"></pre>
 
   <script>
-    fetch('https://young-sunset-d631.koolee1372.workers.dev/api/content')
+    /************************************************************
+     * 🔧 환경 설정 (반드시 수정)
+     ************************************************************/
+    const API_BASE_URL = 'https://young-sunset-d631.koolee1372.workers.dev/api/content';
+    const ADMIN_TOKEN = 'ADMIN_SECRET';
+
+    /************************************************************
+     * 전역 상태
+     ************************************************************/
+    let contentData = null;
+    let currentTab = 'form';
+
+    /************************************************************
+     * 초기 로딩
+     ************************************************************/
+    fetch(API_BASE_URL + '/api/content')
       .then(res => res.json())
       .then(data => {
-        document.getElementById('output').textContent =
-          JSON.stringify(data, null, 2);
+        contentData = data;
+        renderFormEditor(data);
+        renderRawEditor(data);
+      })
+      .catch(err => {
+        document.getElementById('status').textContent =
+          '콘텐츠 로딩 실패: ' + err.message;
       });
+
+    /************************************************************
+     * 탭 전환
+     ************************************************************/
+    function showTab(tab) {
+      currentTab = tab;
+      document.getElementById('formTab').classList.toggle('hidden', tab !== 'form');
+      document.getElementById('rawTab').classList.toggle('hidden', tab !== 'raw');
+    }
+
+    /************************************************************
+     * Raw JSON 편집기
+     ************************************************************/
+    function renderRawEditor(data) {
+      document.getElementById('rawTab').innerHTML = `
+        <h3>전체 JSON 편집</h3>
+        <textarea id="rawEditor">${JSON.stringify(data, null, 2)}</textarea>
+      `;
+    }
+
+    /************************************************************
+     * 폼 기반 편집기
+     ************************************************************/
+    function renderFormEditor(data) {
+      if (!data.sections) {
+        document.getElementById('formTab').innerHTML = 'sections 없음';
+        return;
+      }
+
+      const html = data.sections
+        .sort((a, b) => a.order - b.order)
+        .map((sec, idx) => `
+          <div class="section-box">
+            <strong>${sec.id} (${sec.type})</strong>
+
+            <label>
+              활성화
+              <input type="checkbox"
+                ${sec.enabled ? 'checked' : ''}
+                onchange="contentData.sections[${idx}].enabled=this.checked">
+            </label>
+
+            <label>
+              순서
+              <input type="number"
+                value="${sec.order}"
+                onchange="contentData.sections[${idx}].order=Number(this.value)">
+            </label>
+
+            <label>
+              제목
+              <input type="text"
+                value="${sec.content?.title || ''}"
+                onchange="contentData.sections[${idx}].content.title=this.value">
+            </label>
+          </div>
+        `)
+        .join('');
+
+      document.getElementById('formTab').innerHTML = `
+        <h3>섹션별 폼 편집</h3>
+        ${html}
+      `;
+    }
+
+    /************************************************************
+     * 저장 (KV 반영)
+     ************************************************************/
+    function save() {
+      let dataToSave = contentData;
+
+      if (currentTab === 'raw') {
+        const raw = document.getElementById('rawEditor').value;
+        try {
+          dataToSave = JSON.parse(raw);
+        } catch (e) {
+          alert('JSON 형식 오류');
+          return;
+        }
+      }
+
+      fetch(API_BASE_URL + '/api/content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + ADMIN_TOKEN
+        },
+        body: JSON.stringify(dataToSave)
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('저장 실패');
+          return res.json();
+        })
+        .then(() => {
+          contentData = dataToSave;
+          renderFormEditor(contentData);
+          renderRawEditor(contentData);
+          document.getElementById('status').textContent =
+            '✅ 저장 완료 — 메인 페이지에 즉시 반영됩니다.';
+        })
+        .catch(err => {
+          document.getElementById('status').textContent =
+            '❌ 오류: ' + err.message;
+        });
+    }
   </script>
 
 </body>
