@@ -1,15 +1,17 @@
-const API_URL = 'https://young-sunset-d631.koolee1372.workers.dev/api/content';
+const API_BASE_URL = 'https://young-sunset-d631.koolee1372.workers.dev';
 
 /* ===============================
    Entry
 ================================ */
-fetch(API_URL)
+fetch(API_BASE_URL + '/api/content')
   .then(res => res.json())
   .then(data => {
     renderHeader(data.navigation || []);
     renderSections(data.sections || []);
   })
-  .catch(err => console.error(err));
+  .catch(err => {
+    console.error('Content load failed:', err);
+  });
 
 /* ===============================
    Header
@@ -21,21 +23,25 @@ function renderHeader(navigation) {
   header.innerHTML = `
     <nav>
       <ul>
-        ${navigation.filter(n => n.enabled).map(n => `
-          <li>
-            <a href="#${n.target}" data-target="${n.target}">
-              ${n.label}
-            </a>
-          </li>
-        `).join('')}
+        ${navigation
+          .filter(n => n.enabled)
+          .map(n => `
+            <li>
+              <a href="#${n.target}" data-target="${n.target}">
+                ${n.label}
+              </a>
+            </li>
+          `)
+          .join('')}
       </ul>
     </nav>
   `;
 
-  header.querySelectorAll('a').forEach(a => {
-    a.addEventListener('click', e => {
+  header.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', e => {
       e.preventDefault();
-      document.getElementById(a.dataset.target)
+      const target = link.dataset.target;
+      document.getElementById(target)
         ?.scrollIntoView({ behavior: 'smooth' });
     });
   });
@@ -46,91 +52,124 @@ function renderHeader(navigation) {
 ================================ */
 function renderSections(sections) {
   const app = document.getElementById('app');
+  if (!app) return;
+
   app.innerHTML = '';
 
   sections
     .filter(s => s.enabled)
     .sort((a, b) => a.order - b.order)
     .forEach(section => {
-      const el = document.createElement('section');
-      el.id = section.id;
-      el.className = `section section-${section.type}`;
-
-      if (section.type === 'hero') {
-        el.innerHTML = `
-          <h1>${section.content?.title || ''}</h1>
-          <p>${section.content?.subtitle || ''}</p>
-        `;
-      }
-
-      if (section.type === 'service') {
-        el.appendChild(renderService(section));
-      }
-
-      if (section.type === 'cta') {
-        el.innerHTML = `<h2>${section.content?.title || ''}</h2>`;
-      }
-
-      app.appendChild(el);
+      const el = renderSection(section);
+      if (el) app.appendChild(el);
     });
 }
 
-/* ===============================
-   Service Renderer (Grid / Slider)
-================================ */
-function renderService(section) {
-  const wrapper = document.createElement('div');
-  const { title, cards = [] } = section.content || {};
-  const options = section.options || {};
-  const isSlider = options.layout === 'slider' || options.slider?.enabled;
+function renderSection(section) {
+  const el = document.createElement('section');
+  el.id = section.id;
+  el.className = `section section-${section.type}`;
 
-  wrapper.innerHTML = `<h2>${title || ''}</h2>`;
+  switch (section.type) {
+    case 'hero':
+      el.innerHTML = renderHero(section);
+      break;
 
-  const activeCards = cards.filter(c => c.enabled);
+    case 'service':
+      el.innerHTML = renderService(section);
+      break;
 
-  if (!isSlider) {
-    // GRID
-    const grid = document.createElement('div');
-    grid.className = 'card-grid';
+    case 'cta':
+      el.innerHTML = renderCTA(section);
+      break;
 
-    grid.innerHTML = activeCards.map(c => `
-      <div class="card">
-        <h3>${c.title}</h3>
-        <p>${c.desc}</p>
-      </div>
-    `).join('');
-
-    wrapper.appendChild(grid);
-    return wrapper;
+    default:
+      console.warn('Unknown section type:', section.type);
+      return null;
   }
 
-  // SLIDER
-  const slider = document.createElement('div');
-  slider.className = 'card-slider';
-
-  activeCards.forEach((c, idx) => {
-    const slide = document.createElement('div');
-    slide.className = 'card slide';
-    slide.style.display = idx === 0 ? 'block' : 'none';
-    slide.innerHTML = `<h3>${c.title}</h3><p>${c.desc}</p>`;
-    slider.appendChild(slide);
-  });
-
-  wrapper.appendChild(slider);
-
-  initSlider(slider, options.slider || {});
-  return wrapper;
+  return el;
 }
 
 /* ===============================
-   Simple Slider Logic
+   Section Templates
 ================================ */
-function initSlider(sliderEl, sliderOptions) {
-  const slides = sliderEl.querySelectorAll('.slide');
-  if (slides.length <= 1) return;
+function renderHero(section) {
+  const { title, subtitle } = section.content || {};
+  return `
+    <h1>${title || ''}</h1>
+    <p>${subtitle || ''}</p>
+  `;
+}
+
+function renderService(section) {
+  const { title, cards = [] } = section.content || {};
+  const layout = section.options?.layout || 'grid';
+
+  if (layout === 'slider') {
+    return renderServiceSlider(title, cards, section.options?.slider);
+  }
+
+  // default: grid
+  return `
+    <h2>${title || ''}</h2>
+    <div class="card-grid">
+      ${cards
+        .filter(c => c.enabled)
+        .map(card => `
+          <div class="card">
+            <h3>${card.title || ''}</h3>
+            <p>${card.desc || ''}</p>
+          </div>
+        `)
+        .join('')}
+    </div>
+  `;
+}
+
+function renderServiceSlider(title, cards, sliderOptions = {}) {
+  const interval = sliderOptions.interval || 4000;
+  const id = 'slider-' + Math.random().toString(36).slice(2);
+
+  setTimeout(() => initSlider(id, interval), 0);
+
+  return `
+    <h2>${title || ''}</h2>
+    <div class="card-slider" id="${id}">
+      ${cards
+        .filter(c => c.enabled)
+        .map(card => `
+          <div class="card slide">
+            <h3>${card.title || ''}</h3>
+            <p>${card.desc || ''}</p>
+          </div>
+        `)
+        .join('')}
+    </div>
+  `;
+}
+
+function renderCTA(section) {
+  const { title } = section.content || {};
+  return `
+    <h2>${title || ''}</h2>
+  `;
+}
+
+/* ===============================
+   Slider Logic (simple)
+================================ */
+function initSlider(containerId, interval) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const slides = Array.from(container.children);
+  if (slides.length === 0) return;
 
   let index = 0;
-  const interval = sliderOptions.interval || 4000;
+  slides.forEach((s, i) => {
+    s.style.display = i === 0 ? 'block' : 'none';
+  });
 
   setInterval(() => {
     slides[index].style.display = 'none';
