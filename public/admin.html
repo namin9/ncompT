@@ -26,22 +26,7 @@
       border-color: #111;
     }
     hr { margin: 20px 0; }
-    label {
-      display: block;
-      margin-top: 6px;
-      font-size: 14px;
-    }
-    input, textarea, select {
-      width: 100%;
-      padding: 6px;
-      margin-top: 4px;
-      box-sizing: border-box;
-    }
-    textarea {
-      height: 360px;
-      font-family: monospace;
-    }
-    .hidden { display: none; }
+
     .box {
       background: #fff;
       border: 1px solid #ddd;
@@ -52,10 +37,36 @@
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      margin-bottom: 12px;
     }
-    #status {
-      white-space: pre-wrap;
+    label {
+      display: block;
+      margin-top: 8px;
       font-size: 14px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 6px;
+      margin-top: 4px;
+      box-sizing: border-box;
+    }
+    textarea {
+      height: 320px;
+      font-family: monospace;
+    }
+    .hidden { display: none; }
+
+    iframe {
+      width: 100%;
+      height: 360px;
+      border: 1px solid #ccc;
+      background: #fff;
+    }
+
+    #status {
+      margin-top: 8px;
+      font-size: 14px;
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -63,7 +74,7 @@
 <body>
 
 <!-- ===============================
-     LOGIN
+  LOGIN
 ================================ -->
 <div id="loginBox" class="box hidden">
   <h2>Admin Login</h2>
@@ -75,11 +86,11 @@
   </label>
   <br/>
   <button class="primary" onclick="login()">로그인</button>
-  <pre id="loginStatus"></pre>
+  <div id="loginStatus"></div>
 </div>
 
 <!-- ===============================
-     ADMIN
+  ADMIN
 ================================ -->
 <div id="adminBox" class="hidden">
 
@@ -89,22 +100,23 @@
     <button onclick="showTab('content')">콘텐츠</button>
     <button onclick="showTab('raw')">JSON</button>
     <button onclick="showTab('design')">디자인</button>
-    <button class="primary" onclick="save()">저장</button>
+    <button class="primary" onclick="saveContent()">저장</button>
     <button onclick="logout()">로그아웃</button>
   </div>
-
-  <hr/>
 
   <div id="contentTab"></div>
   <div id="rawTab" class="hidden"></div>
   <div id="designTab" class="hidden"></div>
 
-  <pre id="status"></pre>
+  <h3>미리보기</h3>
+  <iframe id="preview" src="/"></iframe>
+
+  <div id="status"></div>
 </div>
 
 <script>
 /* ===============================
-   ENV
+  ENV / STATE
 ================================ */
 const API = 'https://young-sunset-d631.koolee1372.workers.dev';
 let TOKEN = localStorage.getItem('ADMIN_TOKEN');
@@ -112,23 +124,23 @@ let contentData = null;
 let currentTab = 'content';
 
 /* ===============================
-   INIT
+  INIT
 ================================ */
 if (TOKEN) initAdmin();
 else showLogin();
 
 function showLogin() {
-  loginBox.classList.remove('hidden');
+  document.getElementById('loginBox').classList.remove('hidden');
 }
 
 function initAdmin() {
-  loginBox.classList.add('hidden');
-  adminBox.classList.remove('hidden');
+  document.getElementById('loginBox').classList.add('hidden');
+  document.getElementById('adminBox').classList.remove('hidden');
   loadContent();
 }
 
 /* ===============================
-   AUTH
+  AUTH
 ================================ */
 function login() {
   fetch(API + '/api/admin/login', {
@@ -145,7 +157,9 @@ function login() {
     localStorage.setItem('ADMIN_TOKEN', TOKEN);
     initAdmin();
   })
-  .catch(() => loginStatus.textContent = '❌ 로그인 실패');
+  .catch(() => {
+    loginStatus.textContent = '❌ 로그인 실패';
+  });
 }
 
 function logout() {
@@ -154,7 +168,7 @@ function logout() {
 }
 
 /* ===============================
-   TABS
+  TABS
 ================================ */
 function showTab(tab) {
   currentTab = tab;
@@ -167,7 +181,7 @@ function showTab(tab) {
 }
 
 /* ===============================
-   CONTENT
+  CONTENT
 ================================ */
 function loadContent() {
   fetch(API + '/api/content')
@@ -175,7 +189,7 @@ function loadContent() {
     .then(data => {
       contentData = data;
       renderContentForm();
-      renderRaw();
+      renderRawEditor();
     });
 }
 
@@ -185,25 +199,54 @@ function renderContentForm() {
     .map((s,i)=>`
       <div class="box">
         <strong>${s.id} (${s.type})</strong>
+
         <label>
           활성
           <input type="checkbox" ${s.enabled?'checked':''}
             onchange="contentData.sections[${i}].enabled=this.checked">
         </label>
+
         <label>순서
           <input type="number" value="${s.order}"
             onchange="contentData.sections[${i}].order=Number(this.value)">
         </label>
+
         <label>제목
           <input value="${s.content?.title||''}"
             onchange="contentData.sections[${i}].content.title=this.value">
         </label>
+
+        <label>본문
+          <input value="${s.content?.text||''}"
+            onchange="contentData.sections[${i}].content.text=this.value">
+        </label>
       </div>
     `).join('');
-  contentTab.innerHTML = `<h3>콘텐츠 편집</h3>${html}`;
+
+  contentTab.innerHTML = `
+    <div class="row">
+      <button onclick="addSection()">+ 섹션 추가</button>
+    </div>
+    ${html}
+  `;
 }
 
-function renderRaw() {
+function addSection() {
+  const id = prompt('섹션 ID (예: section3)');
+  if (!id) return;
+
+  contentData.sections.push({
+    id,
+    type: 'custom',
+    enabled: true,
+    order: contentData.sections.length + 1,
+    content: { title: '새 섹션', text: '' }
+  });
+
+  renderContentForm();
+}
+
+function renderRawEditor() {
   rawTab.innerHTML = `
     <h3>전체 JSON</h3>
     <textarea id="rawEditor">${JSON.stringify(contentData, null, 2)}</textarea>
@@ -211,36 +254,32 @@ function renderRaw() {
 }
 
 /* ===============================
-   DESIGN (TOKENS + VERSIONS)
+  DESIGN
 ================================ */
 function loadDesign() {
   Promise.all([
     fetch(API + '/api/design/tokens').then(r=>r.json()),
     fetch(API + '/api/design/versions').then(r=>r.json())
   ]).then(([tokens, meta]) => {
-    renderDesign(tokens, meta);
+    designTab.innerHTML = `
+      <h3>디자인 토큰</h3>
+      <textarea id="designEditor">${JSON.stringify(tokens, null, 2)}</textarea>
+      <br/>
+      <button class="primary" onclick="saveDesign()">디자인 저장</button>
+
+      <hr/>
+      <h3>버전</h3>
+      ${(meta.versions||[]).map(v=>`
+        <div>
+          <strong>${v.id}</strong> (${v.createdAt})
+          ${v.id !== meta.current ? `
+            <button onclick="rollback('${v.id}')">롤백</button>
+            <button onclick="deleteVersion('${v.id}')">삭제</button>
+          ` : '<em> (현재)</em>'}
+        </div>
+      `).join('')}
+    `;
   });
-}
-
-function renderDesign(tokens, meta) {
-  designTab.innerHTML = `
-    <h3>디자인 토큰</h3>
-    <textarea id="designEditor">${JSON.stringify(tokens, null, 2)}</textarea>
-    <br/>
-    <button class="primary" onclick="saveDesign()">디자인 저장</button>
-
-    <hr/>
-    <h3>버전 관리</h3>
-    ${(meta.versions||[]).map(v=>`
-      <div>
-        <strong>${v.id}</strong> (${v.createdAt}) — ${v.memo}
-        ${v.id !== meta.current ? `
-          <button onclick="rollback('${v.id}')">롤백</button>
-          <button onclick="deleteVersion('${v.id}')">삭제</button>
-        ` : '<em> (현재)</em>'}
-      </div>
-    `).join('')
-    }`;
 }
 
 function saveDesign() {
@@ -257,7 +296,7 @@ function saveDesign() {
 }
 
 function rollback(id) {
-  if (!confirm(id + '로 되돌릴까요?')) return;
+  if (!confirm(`${id}로 롤백할까요?`)) return;
   fetch(API + '/api/design/rollback/' + id, {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + TOKEN }
@@ -266,42 +305,45 @@ function rollback(id) {
   .then(msg=>status.textContent=msg);
 }
 
+function deleteVersion(id) {
+  if (!confirm(`${id} 버전을 삭제할까요?`)) return;
+  fetch(API + '/api/design/delete/' + id, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + TOKEN }
+  })
+  .then(r=>r.ok?'✅ 삭제 완료':'❌ 실패')
+  .then(msg=>status.textContent=msg);
+}
+
 /* ===============================
-   SAVE CONTENT
+  SAVE CONTENT
 ================================ */
-function save() {
+function saveContent() {
   if (currentTab === 'raw') {
     try {
       contentData = JSON.parse(rawEditor.value);
     } catch {
-      alert('JSON 오류');
+      alert('JSON 형식 오류');
       return;
     }
   }
 
   fetch(API + '/api/content', {
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'Authorization':'Bearer '+TOKEN
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + TOKEN
     },
-    body:JSON.stringify(contentData)
+    body: JSON.stringify(contentData)
   })
   .then(r=>r.ok?'✅ 저장 완료':'❌ 저장 실패')
-  .then(msg=>status.textContent=msg);
+  .then(msg => {
+    status.textContent = msg;
+    // 미리보기 즉시 갱신
+    const iframe = document.getElementById('preview');
+    iframe.src = iframe.src;
+  });
 }
-
-function deleteVersion(id) {
-  if (!confirm(`${id} 버전을 삭제할까요? (되돌릴 수 없음)`)) return;
-
-  fetch(API + '/api/design/delete/' + id, {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + TOKEN }
-  })
-  .then(r => r.ok ? '✅ 삭제 완료' : '❌ 삭제 실패')
-  .then(msg => status.textContent = msg);
-}
-
 </script>
 
 </body>
