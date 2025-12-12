@@ -4,17 +4,22 @@
   <meta charset="UTF-8" />
   <title>신설법인 DEMO</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="/base.css" />
-  <link rel="stylesheet"
-        href="https://young-sunset-d631.koolee1372.workers.dev/api/style/generated.css" />
+  <link
+    rel="stylesheet"
+    href="https://young-sunset-d631.koolee1372.workers.dev/api/style/generated.css"
+  />
 </head>
 
 <body>
+  <header id="header"></header>
+  <main id="app"></main>
 
-<header id="header"></header>
+  <button
+    style="position:fixed;bottom:20px;right:20px;z-index:999"
+    onclick="window.reloadContent()">
+    🔄 콘텐츠 새로고침
+  </button>
 
-<main id="app"></main>
-
-<script src="/app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
