@@ -1,7 +1,4 @@
 {
-  "site": {
-    "title": "Service Homepage"
-  },
   "sections": [
     {
       "id": "hero",
@@ -11,6 +8,20 @@
       "content": {
         "title": "복잡한 문제를, 가장 단순한 방식으로 해결합니다.",
         "subtitle": "필요한 만큼만, 바로 작동하는 서비스"
+      }
+    },
+    {
+      "id": "service",
+      "type": "service",
+      "enabled": true,
+      "order": 2,
+      "content": {
+        "title": "이렇게 작동합니다",
+        "items": [
+          "바로 시작",
+          "단순한 구조",
+          "유연한 확장"
+        ]
       }
     }
   ]
