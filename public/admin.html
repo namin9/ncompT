@@ -214,16 +214,30 @@ function renderFormEditor() {
    CSS
 ================================ */
 function renderDesignEditor() {
-  fetch(API_BASE_URL + '/api/style/main.css')
-    .then(res => res.text())
-    .then(css => {
+  fetch(API_BASE_URL + '/api/design/tokens')
+    .then(res => res.json())
+    .then(tokens => {
       designTab.innerHTML = `
-        <h3>디자인 CSS</h3>
-        <textarea id="cssEditor" style="height:420px;">${css}</textarea>
+        <h3>디자인 토큰(JSON)</h3>
+        <textarea id="designEditor">${JSON.stringify(tokens, null, 2)}</textarea>
         <br/>
-        <button class="primary" onclick="saveCSS()">CSS 저장</button>
+        <button class="primary" onclick="saveDesignTokens()">디자인 저장</button>
+        <p>※ 저장 즉시 CSS 자동 생성</p>
       `;
     });
+}
+
+function saveDesignTokens() {
+  fetch(API_BASE_URL + '/api/design/tokens', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + TOKEN,
+      'Content-Type': 'application/json'
+    },
+    body: designEditor.value
+  })
+  .then(r => r.ok ? '✅ 디자인 저장 완료' : '❌ 실패')
+  .then(msg => status.textContent = msg);
 }
 
 function saveCSS() {
