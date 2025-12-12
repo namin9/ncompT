@@ -13,7 +13,6 @@
       padding: 24px;
     }
     h1 { margin-top: 0; }
-
     button {
       padding: 6px 12px;
       margin-right: 6px;
@@ -26,51 +25,58 @@
       color: #fff;
       border-color: #111;
     }
-
     hr { margin: 20px 0; }
-
     .section-box {
       background: #fff;
       border: 1px solid #ddd;
       padding: 12px;
       margin-bottom: 16px;
     }
-
     label {
       display: block;
       margin-top: 6px;
       font-size: 14px;
     }
-
     input, textarea, select {
       width: 100%;
       padding: 6px;
       margin-top: 4px;
       box-sizing: border-box;
     }
-
     textarea {
       height: 380px;
       font-family: monospace;
     }
-
     .card-box {
       border: 1px dashed #ccc;
       padding: 8px;
       margin-top: 8px;
     }
-
     .hidden { display: none; }
-
-    #status {
-      margin-top: 12px;
-      white-space: pre-wrap;
-      font-size: 14px;
+    #status { margin-top: 12px; white-space: pre-wrap; }
+    .login-box {
+      max-width: 360px;
+      background: #fff;
+      padding: 20px;
+      border: 1px solid #ddd;
     }
   </style>
 </head>
 
 <body>
+
+<!-- 로그인 -->
+<div id="loginBox" class="login-box hidden">
+  <h2>Admin Login</h2>
+  <input id="loginId" placeholder="ID" />
+  <input id="loginPw" type="password" placeholder="Password" />
+  <br/><br/>
+  <button class="primary" onclick="login()">로그인</button>
+  <pre id="loginStatus"></pre>
+</div>
+
+<!-- 어드민 -->
+<div id="adminBox" class="hidden">
 
 <h1>Homepage Admin</h1>
 
@@ -79,6 +85,7 @@
   <button onclick="showTab('raw')">JSON 편집</button>
   <button onclick="showTab('design')">디자인(CSS)</button>
   <button class="primary" onclick="save()">저장</button>
+  <button onclick="logout()">로그아웃</button>
 </div>
 
 <hr/>
@@ -89,36 +96,73 @@
 
 <pre id="status"></pre>
 
+</div>
+
 <script>
 /* ===============================
-   환경 설정
+   환경
 ================================ */
 const API_BASE_URL = 'https://young-sunset-d631.koolee1372.workers.dev';
-const ADMIN_TOKEN = 'ADMIN_SECRET';
-
-/* ===============================
-   상태
-================================ */
+let TOKEN = localStorage.getItem('ADMIN_TOKEN');
 let contentData = null;
 let currentTab = 'form';
 
 /* ===============================
-   초기 로딩
+   초기 진입
 ================================ */
-fetch(API_BASE_URL + '/api/content')
-  .then(res => res.json())
-  .then(data => {
-    contentData = data;
-    renderFormEditor();
-    renderRawEditor();
-  })
-  .catch(err => {
-    document.getElementById('status').textContent =
-      '콘텐츠 로딩 실패: ' + err.message;
-  });
+if (TOKEN) {
+  initAdmin();
+} else {
+  showLogin();
+}
+
+function showLogin() {
+  loginBox.classList.remove('hidden');
+}
+
+function initAdmin() {
+  loginBox.classList.add('hidden');
+  adminBox.classList.remove('hidden');
+
+  fetch(API_BASE_URL + '/api/content')
+    .then(res => res.json())
+    .then(data => {
+      contentData = data;
+      renderFormEditor();
+      renderRawEditor();
+    });
+}
 
 /* ===============================
-   탭 전환
+   로그인
+================================ */
+function login() {
+  fetch(API_BASE_URL + '/api/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: loginId.value,
+      password: loginPw.value
+    })
+  })
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(res => {
+    TOKEN = res.token;
+    localStorage.setItem('ADMIN_TOKEN', TOKEN);
+    initAdmin();
+  })
+  .catch(() => {
+    loginStatus.textContent = '❌ 로그인 실패';
+  });
+}
+
+function logout() {
+  localStorage.removeItem('ADMIN_TOKEN');
+  location.reload();
+}
+
+/* ===============================
+   탭
 ================================ */
 function showTab(tab) {
   currentTab = tab;
@@ -126,152 +170,55 @@ function showTab(tab) {
     document.getElementById(id).classList.add('hidden');
   });
   document.getElementById(tab + 'Tab').classList.remove('hidden');
-
-  if (tab === 'design') {
-    renderDesignEditor();
-  }
+  if (tab === 'design') renderDesignEditor();
 }
 
 /* ===============================
-   Raw JSON 편집기
+   Raw
 ================================ */
 function renderRawEditor() {
-  document.getElementById('rawTab').innerHTML = `
-    <h3>전체 JSON 편집</h3>
+  rawTab.innerHTML = `
+    <h3>전체 JSON</h3>
     <textarea id="rawEditor">${JSON.stringify(contentData, null, 2)}</textarea>
   `;
 }
 
 /* ===============================
-   Form 편집기
+   Form
 ================================ */
 function renderFormEditor() {
   const html = contentData.sections
     .sort((a,b)=>a.order-b.order)
-    .map((sec, sIdx) => {
+    .map((sec, sIdx) => `
+      <div class="section-box">
+        <strong>${sec.id} (${sec.type})</strong>
+        <label>
+          활성 <input type="checkbox" ${sec.enabled?'checked':''}
+            onchange="contentData.sections[${sIdx}].enabled=this.checked">
+        </label>
+        <label>순서
+          <input type="number" value="${sec.order}"
+            onchange="contentData.sections[${sIdx}].order=Number(this.value)">
+        </label>
+        <label>제목
+          <input value="${sec.content?.title||''}"
+            onchange="contentData.sections[${sIdx}].content.title=this.value">
+        </label>
+      </div>
+    `).join('');
 
-      const cardsUI = Array.isArray(sec.content?.cards)
-        ? sec.content.cards.map((c, cIdx) => `
-          <div class="card-box">
-            <label>
-              활성
-              <input type="checkbox" ${c.enabled?'checked':''}
-                onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].enabled=this.checked">
-            </label>
-            <label>카드 제목
-              <input value="${c.title}"
-                onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].title=this.value">
-            </label>
-            <label>카드 설명
-              <input value="${c.desc}"
-                onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].desc=this.value">
-            </label>
-            <button onclick="moveCard(${sIdx},${cIdx},-1)">▲</button>
-            <button onclick="moveCard(${sIdx},${cIdx},1)">▼</button>
-          </div>
-        `).join('')
-        : '';
-
-      return `
-        <div class="section-box">
-          <strong>${sec.id} (${sec.type})</strong>
-
-          <label>
-            섹션 활성
-            <input type="checkbox" ${sec.enabled?'checked':''}
-              onchange="contentData.sections[${sIdx}].enabled=this.checked">
-          </label>
-
-          <label>순서
-            <input type="number" value="${sec.order}"
-              onchange="contentData.sections[${sIdx}].order=Number(this.value)">
-          </label>
-
-          <label>섹션 제목
-            <input value="${sec.content?.title||''}"
-              onchange="contentData.sections[${sIdx}].content.title=this.value">
-          </label>
-
-          ${cardsUI}
-
-          ${Array.isArray(sec.content?.cards) ? `
-            <button onclick="addCard(${sIdx})">+ 카드 추가</button>
-
-            <hr/>
-
-            <strong>레이아웃 옵션</strong>
-            <label>
-              레이아웃
-              <select onchange="
-                contentData.sections[${sIdx}].options =
-                  contentData.sections[${sIdx}].options || {};
-                contentData.sections[${sIdx}].options.layout=this.value
-              ">
-                <option value="grid" ${(sec.options?.layout!=='slider')?'selected':''}>Grid</option>
-                <option value="slider" ${(sec.options?.layout==='slider')?'selected':''}>Slider</option>
-              </select>
-            </label>
-
-            <label>
-              슬라이드 자동재생
-              <input type="checkbox" ${sec.options?.slider?.enabled?'checked':''}
-                onchange="
-                  contentData.sections[${sIdx}].options.slider =
-                    contentData.sections[${sIdx}].options.slider || {};
-                  contentData.sections[${sIdx}].options.slider.enabled=this.checked
-                ">
-            </label>
-
-            <label>
-              슬라이드 간격(ms)
-              <input type="number" value="${sec.options?.slider?.interval||4000}"
-                onchange="
-                  contentData.sections[${sIdx}].options.slider =
-                    contentData.sections[${sIdx}].options.slider || {};
-                  contentData.sections[${sIdx}].options.slider.interval=Number(this.value)
-                ">
-            </label>
-          ` : ''}
-        </div>
-      `;
-    }).join('');
-
-  document.getElementById('formTab').innerHTML = `
-    <h3>섹션 & 카드 편집</h3>
-    ${html}
-  `;
+  formTab.innerHTML = `<h3>섹션 편집</h3>${html}`;
 }
 
 /* ===============================
-   카드 유틸
-================================ */
-function addCard(sIdx) {
-  contentData.sections[sIdx].content.cards.push({
-    id:'card-'+Date.now(),
-    title:'새 카드',
-    desc:'',
-    enabled:true
-  });
-  renderFormEditor();
-}
-
-function moveCard(sIdx,cIdx,d) {
-  const cards = contentData.sections[sIdx].content.cards;
-  const t = cIdx+d;
-  if(t<0||t>=cards.length) return;
-  [cards[cIdx],cards[t]]=[cards[t],cards[cIdx]];
-  renderFormEditor();
-}
-
-/* ===============================
-   디자인(CSS) 편집기
+   CSS
 ================================ */
 function renderDesignEditor() {
   fetch(API_BASE_URL + '/api/style/main.css')
     .then(res => res.text())
     .then(css => {
-      document.getElementById('designTab').innerHTML = `
-        <h3>디자인 CSS 편집</h3>
+      designTab.innerHTML = `
+        <h3>디자인 CSS</h3>
         <textarea id="cssEditor" style="height:420px;">${css}</textarea>
         <br/>
         <button class="primary" onclick="saveCSS()">CSS 저장</button>
@@ -281,29 +228,26 @@ function renderDesignEditor() {
 
 function saveCSS() {
   fetch(API_BASE_URL + '/api/style/main.css', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + ADMIN_TOKEN,
-      'Content-Type': 'text/plain'
+    method:'POST',
+    headers:{
+      'Authorization':'Bearer '+TOKEN,
+      'Content-Type':'text/plain'
     },
-    body: document.getElementById('cssEditor').value
+    body:cssEditor.value
   })
-  .then(r => r.ok ? '✅ CSS 저장 완료 (새로고침 시 반영)' : '❌ CSS 저장 실패')
-  .then(msg => document.getElementById('status').textContent = msg)
-  .catch(() => {
-    document.getElementById('status').textContent = '❌ CSS 저장 중 오류';
-  });
+  .then(r=>r.ok?'✅ CSS 저장 완료':'❌ 실패')
+  .then(msg=>status.textContent=msg);
 }
 
 /* ===============================
-   저장 (JSON)
+   저장
 ================================ */
 function save() {
   if (currentTab === 'raw') {
     try {
-      contentData = JSON.parse(document.getElementById('rawEditor').value);
-    } catch(e) {
-      alert('JSON 형식 오류');
+      contentData = JSON.parse(rawEditor.value);
+    } catch {
+      alert('JSON 오류');
       return;
     }
   }
@@ -312,15 +256,12 @@ function save() {
     method:'POST',
     headers:{
       'Content-Type':'application/json',
-      'Authorization':'Bearer ' + ADMIN_TOKEN
+      'Authorization':'Bearer '+TOKEN
     },
     body:JSON.stringify(contentData)
   })
   .then(r=>r.ok?'✅ 저장 완료':'❌ 저장 실패')
-  .then(msg => document.getElementById('status').textContent = msg)
-  .catch(()=> {
-    document.getElementById('status').textContent = '❌ 저장 중 오류';
-  });
+  .then(msg=>status.textContent=msg);
 }
 </script>
 
