@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 24px;
+      background: #f7f7f7;
+    }
+    pre {
+      background: #111;
+      color: #0f0;
+      padding: 16px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Homepage Admin</h1>
+  <p>현재 KV에 저장된 콘텐츠</p>
+
+  <pre id="output">Loading...</pre>
+
+  <script>
+    fetch('https://homepage-api.계정명.workers.dev/api/content')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('output').textContent =
+          JSON.stringify(data, null, 2);
+      });
+  </script>
+
+</body>
+</html>
