@@ -275,6 +275,32 @@
             '❌ 오류: ' + err.message;
         });
     }
+
+    function addCard(sectionIndex) {
+      const cards = contentData.sections[sectionIndex].content.cards;
+    
+      cards.push({
+        id: 'card-' + Date.now(),
+        title: '새 카드',
+        desc: '',
+        enabled: true
+      });
+    
+      renderFormEditor(contentData);
+    }
+    
+    function moveCard(sectionIndex, cardIndex, direction) {
+      const cards = contentData.sections[sectionIndex].content.cards;
+      const targetIndex = cardIndex + direction;
+    
+      if (targetIndex < 0 || targetIndex >= cards.length) return;
+    
+      const temp = cards[cardIndex];
+      cards[cardIndex] = cards[targetIndex];
+      cards[targetIndex] = temp;
+    
+      renderFormEditor(contentData);
+    }
   </script>
 
 </body>
