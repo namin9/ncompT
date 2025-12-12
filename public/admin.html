@@ -10,39 +10,20 @@
       font-family: system-ui, sans-serif;
       background: #f5f6f8;
       margin: 0;
-      padding: 24px;
+      padding: 20px;
     }
     h1, h2, h3 { margin-top: 0; }
-
-    .hidden { display: none; }
-
     .box {
       background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
+      border-radius: 8px;
       padding: 16px;
       margin-bottom: 16px;
     }
-
-    .row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
+    label {
+      display: block;
+      margin-top: 8px;
+      font-size: 14px;
     }
-
-    button {
-      padding: 6px 12px;
-      border: 1px solid #ccc;
-      background: #fff;
-      cursor: pointer;
-    }
-    button.primary {
-      background: #111;
-      color: #fff;
-      border-color: #111;
-    }
-
     input, textarea, select {
       width: 100%;
       padding: 6px;
@@ -50,333 +31,237 @@
       margin-top: 4px;
     }
     textarea {
-      height: 260px;
       font-family: monospace;
+      height: 240px;
     }
-
-    /* Section list */
-    .section-list { display: flex; flex-direction: column; gap: 10px; }
+    button {
+      margin-top: 10px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    button.primary {
+      background: #111;
+      color: #fff;
+      border: none;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
     .section-item {
-      background: #fff;
       border: 1px solid #e5e7eb;
-      border-radius: 10px;
+      border-radius: 6px;
       padding: 12px;
-      display: grid;
-      grid-template-columns: 28px 1fr auto;
-      gap: 12px;
-      align-items: center;
-    }
-    .drag-handle {
-      cursor: grab;
-      color: #9ca3af;
-      font-size: 18px;
-    }
-    .section-meta { display: grid; gap: 6px; }
-    .section-actions { display: flex; gap: 6px; }
-    .section-item.dragging { opacity: 0.6; }
-    .section-item.over { outline: 2px dashed #c7d2fe; }
-
-    #status {
-      font-size: 14px;
-      white-space: pre-wrap;
+      margin-bottom: 12px;
     }
   </style>
 </head>
 
 <body>
 
+<h1>Homepage Admin</h1>
+
 <!-- ===============================
-     LOGIN
+     CONTENT
 ================================ -->
-<div id="loginBox" class="box">
-  <h2>Admin Login</h2>
-  <label>ID
-    <input id="loginId" />
-  </label>
-  <label>Password
-    <input id="loginPw" type="password" />
-  </label>
-  <br/>
-  <button class="primary" onclick="login()">로그인</button>
-  <pre id="loginStatus"></pre>
+<div class="box">
+  <h2>콘텐츠 관리</h2>
+  <div id="sections"></div>
+  <button onclick="addSection()">+ 섹션 추가</button>
 </div>
 
 <!-- ===============================
-     ADMIN
+     DESIGN TOKENS
 ================================ -->
-<div id="adminBox" class="hidden">
+<div class="box">
+  <h2>디자인 토큰</h2>
+  <textarea id="tokenEditor"></textarea>
+  <button class="primary" onclick="saveTokens()">디자인 토큰 저장</button>
+</div>
 
-  <h1>Homepage Admin</h1>
-
-  <div class="row">
-    <button onclick="showTab('content')">콘텐츠</button>
-    <button onclick="showTab('design')">디자인</button>
-    <button onclick="showTab('raw')">JSON</button>
-    <button class="primary" onclick="save()">저장</button>
-    <button onclick="logout()">로그아웃</button>
-  </div>
-
-  <hr/>
-
-  <!-- Tabs -->
-  <div id="contentTab"></div>
-  <div id="designTab" class="hidden"></div>
-  <div id="rawTab" class="hidden"></div>
-
-  <pre id="status"></pre>
+<!-- ===============================
+     SAVE
+================================ -->
+<div class="box">
+  <button class="primary" onclick="saveContent()">💾 콘텐츠 저장</button>
 </div>
 
 <script>
-/* ===============================
+/* =========================================================
    ENV
-================================ */
-const API = 'https://young-sunset-d631.koolee1372.workers.dev';
-let TOKEN = localStorage.getItem('ADMIN_TOKEN');
-let contentData = null;
-let currentTab = 'content';
+========================================================= */
+const API_BASE = 'https://young-sunset-d631.koolee1372.workers.dev';
+const ADMIN_TOKEN = 'ADMIN_SECRET';
 
-/* ===============================
+let PAGE_DATA = null;
+let DESIGN_TOKENS = null;
+
+/* =========================================================
    INIT
-================================ */
-if (TOKEN) initAdmin();
-else showLogin();
+========================================================= */
+Promise.all([
+  fetch(API_BASE + '/api/content').then(r => r.json()),
+  fetch(API_BASE + '/api/design/tokens').then(r => r.json())
+]).then(([content, tokens]) => {
+  PAGE_DATA = content;
+  DESIGN_TOKENS = tokens;
+  renderAdmin();
+});
 
-function showLogin() {
-  loginBox.classList.remove('hidden');
-}
-function initAdmin() {
-  loginBox.classList.add('hidden');
-  adminBox.classList.remove('hidden');
-  loadContent();
-}
-
-/* ===============================
-   AUTH
-================================ */
-function login() {
-  fetch(API + '/api/admin/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id: loginId.value,
-      password: loginPw.value
-    })
-  })
-  .then(r => r.ok ? r.json() : Promise.reject())
-  .then(res => {
-    TOKEN = res.token;
-    localStorage.setItem('ADMIN_TOKEN', TOKEN);
-    initAdmin();
-  })
-  .catch(() => loginStatus.textContent = '❌ 로그인 실패');
+/* =========================================================
+   RENDER ADMIN
+========================================================= */
+function renderAdmin() {
+  renderSections();
+  tokenEditor.value = JSON.stringify(DESIGN_TOKENS, null, 2);
 }
 
-function logout() {
-  localStorage.removeItem('ADMIN_TOKEN');
-  location.reload();
-}
+/* =========================================================
+   SECTIONS
+========================================================= */
+function renderSections() {
+  const container = document.getElementById('sections');
+  container.innerHTML = '';
 
-/* ===============================
-   TABS
-================================ */
-function showTab(tab) {
-  currentTab = tab;
-  ['contentTab','designTab','rawTab']
-    .forEach(id => document.getElementById(id).classList.add('hidden'));
-  document.getElementById(tab + 'Tab').classList.remove('hidden');
+  PAGE_DATA.sections
+    .sort((a,b)=>a.order-b.order)
+    .forEach((sec, idx) => {
+      const el = document.createElement('div');
+      el.className = 'section-item';
 
-  if (tab === 'design') loadDesign();
-  if (tab === 'raw') renderRaw();
-}
+      el.innerHTML = `
+        <strong>${sec.type}</strong>
 
-/* ===============================
-   CONTENT
-================================ */
-function loadContent() {
-  fetch(API + '/api/content')
-    .then(r => r.json())
-    .then(data => {
-      contentData = data;
-      renderSectionList();
+        <label>
+          활성
+          <input type="checkbox" ${sec.enabled?'checked':''}
+            onchange="toggleSection(${idx}, this.checked)">
+        </label>
+
+        <label>
+          제목
+          <input value="${sec.content?.title || ''}"
+            oninput="updateTitle(${idx}, this.value)">
+        </label>
+
+        <label>
+          부제목
+          <input value="${sec.content?.subtitle || ''}"
+            oninput="updateSubtitle(${idx}, this.value)">
+        </label>
+
+        <label>
+          이미지 URL (R2 전제)
+          <input value="${sec.media?.url || ''}"
+            placeholder="https://..."
+            oninput="updateImage(${idx}, this.value)">
+        </label>
+
+        <div class="row">
+          <button onclick="moveSection(${idx}, -1)">▲</button>
+          <button onclick="moveSection(${idx}, 1)">▼</button>
+          <button onclick="removeSection(${idx})">삭제</button>
+        </div>
+      `;
+
+      container.appendChild(el);
     });
 }
 
-function renderSectionList() {
-  contentTab.innerHTML = `
-    <h3>섹션 관리</h3>
-    <div class="row">
-      <button onclick="addSection()">+ 섹션 추가</button>
-      <button onclick="preview()">미리보기</button>
-    </div>
-    <div id="sectionList" class="section-list"></div>
-  `;
-  const list = document.getElementById('sectionList');
-
-  list.innerHTML = contentData.sections
-    .sort((a,b)=>a.order-b.order)
-    .map((s,i)=>`
-      <div class="section-item"
-        draggable="true"
-        data-index="${i}"
-        ondragstart="onDragStart(event)"
-        ondragover="onDragOver(event)"
-        ondragleave="onDragLeave(event)"
-        ondrop="onDrop(event)"
-        ondragend="onDragEnd(event)">
-
-        <div class="drag-handle">⋮⋮</div>
-
-        <div class="section-meta">
-          <strong>${s.type.toUpperCase()}</strong>
-          <small>${s.id}</small>
-
-          <label>
-            활성
-            <input type="checkbox" ${s.enabled?'checked':''}
-              onchange="contentData.sections[${i}].enabled=this.checked; preview();">
-          </label>
-
-          <label>제목
-            <input value="${s.content?.title||''}"
-              onchange="contentData.sections[${i}].content.title=this.value; preview();">
-          </label>
-        </div>
-
-        <div class="section-actions">
-          <button onclick="moveSection(${i},-1)">▲</button>
-          <button onclick="moveSection(${i},1)">▼</button>
-          <button onclick="removeSection(${i})">삭제</button>
-        </div>
-      </div>
-    `).join('');
-}
-
-/* ===============================
-   Section Ops
-================================ */
+/* =========================================================
+   SECTION OPERATIONS
+========================================================= */
 function addSection() {
-  const type = prompt('섹션 타입 (hero / cards / list / cta / gallery / faq / pricing)');
-  if (!type) return;
-
-  const base = {
-    id: type + '-' + Date.now(),
-    type,
+  PAGE_DATA.sections.push({
+    id: 'section-' + Date.now(),
+    type: 'hero',
     enabled: true,
-    order: contentData.sections.length + 1,
-    content: { title: '', subtitle: '', items: [] },
-    media: { type: 'image', ratio: '16-9', position: 'top' },
-    options: {}
-  };
-
-  if (type === 'cards') base.content.items = [{ title:'카드', desc:'설명' }];
-  if (type === 'list') base.content.items = ['항목'];
-
-  contentData.sections.push(base);
-  renderSectionList();
-  preview();
-}
-
-function moveSection(i, d) {
-  const j = i + d;
-  if (j < 0 || j >= contentData.sections.length) return;
-  [contentData.sections[i], contentData.sections[j]] =
-    [contentData.sections[j], contentData.sections[i]];
-  contentData.sections.forEach((s,idx)=>s.order=idx+1);
-  renderSectionList();
+    order: PAGE_DATA.sections.length + 1,
+    content: { title: '새 섹션', subtitle: '' },
+    media: { ratio: '16-9' }
+  });
+  renderSections();
   preview();
 }
 
 function removeSection(i) {
-  if (!confirm('섹션을 삭제할까요?')) return;
-  contentData.sections.splice(i,1);
-  contentData.sections.forEach((s,idx)=>s.order=idx+1);
-  renderSectionList();
+  if (!confirm('삭제할까요?')) return;
+  PAGE_DATA.sections.splice(i, 1);
+  reorder();
+  renderSections();
   preview();
 }
 
-/* ===============================
-   Drag & Drop
-================================ */
-let dragFrom = null;
-
-function onDragStart(e) {
-  dragFrom = Number(e.currentTarget.dataset.index);
-  e.currentTarget.classList.add('dragging');
-}
-function onDragOver(e) {
-  e.preventDefault();
-  e.currentTarget.classList.add('over');
-}
-function onDragLeave(e) {
-  e.currentTarget.classList.remove('over');
-}
-function onDrop(e) {
-  e.preventDefault();
-  const to = Number(e.currentTarget.dataset.index);
-  if (dragFrom === to) return;
-
-  const moved = contentData.sections.splice(dragFrom,1)[0];
-  contentData.sections.splice(to,0,moved);
-  contentData.sections.forEach((s,idx)=>s.order=idx+1);
-
-  renderSectionList();
+function moveSection(i, d) {
+  const t = i + d;
+  if (t < 0 || t >= PAGE_DATA.sections.length) return;
+  [PAGE_DATA.sections[i], PAGE_DATA.sections[t]] =
+    [PAGE_DATA.sections[t], PAGE_DATA.sections[i]];
+  reorder();
+  renderSections();
   preview();
 }
-function onDragEnd(e) {
-  document.querySelectorAll('.section-item')
-    .forEach(el=>el.classList.remove('dragging','over'));
+
+function reorder() {
+  PAGE_DATA.sections.forEach((s, i) => s.order = i + 1);
 }
 
-/* ===============================
+function toggleSection(i, val) {
+  PAGE_DATA.sections[i].enabled = val;
+  preview();
+}
+
+function updateTitle(i, val) {
+  PAGE_DATA.sections[i].content.title = val;
+  preview();
+}
+
+function updateSubtitle(i, val) {
+  PAGE_DATA.sections[i].content.subtitle = val;
+  preview();
+}
+
+function updateImage(i, val) {
+  PAGE_DATA.sections[i].media = PAGE_DATA.sections[i].media || {};
+  PAGE_DATA.sections[i].media.url = val;
+  preview();
+}
+
+/* =========================================================
    PREVIEW
-================================ */
+========================================================= */
 function preview() {
-  window.open('/', 'preview');
+  window.opener?.postMessage({
+    type: 'PREVIEW',
+    data: PAGE_DATA
+  }, '*');
 }
 
-/* ===============================
-   RAW JSON
-================================ */
-function renderRaw() {
-  rawTab.innerHTML = `
-    <h3>Raw JSON</h3>
-    <textarea id="rawEditor">${JSON.stringify(contentData, null, 2)}</textarea>
-  `;
-}
-
-/* ===============================
-   DESIGN (Tokens only – UI placeholder)
-================================ */
-function loadDesign() {
-  designTab.innerHTML = `
-    <h3>디자인 토큰</h3>
-    <p>디자인 토큰 편집 UI는 다음 단계에서 고도화됩니다.</p>
-  `;
-}
-
-/* ===============================
+/* =========================================================
    SAVE
-================================ */
-function save() {
-  if (currentTab === 'raw') {
-    try {
-      contentData = JSON.parse(rawEditor.value);
-    } catch {
-      alert('JSON 오류');
-      return;
-    }
-  }
-
-  fetch(API + '/api/content', {
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'Authorization':'Bearer ' + TOKEN
+========================================================= */
+function saveContent() {
+  fetch(API_BASE + '/api/content', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + ADMIN_TOKEN
     },
-    body:JSON.stringify(contentData)
-  })
-  .then(r=>r.ok?'✅ 저장 완료':'❌ 저장 실패')
-  .then(msg=>status.textContent=msg);
+    body: JSON.stringify(PAGE_DATA)
+  });
+}
+
+function saveTokens() {
+  DESIGN_TOKENS = JSON.parse(tokenEditor.value);
+  fetch(API_BASE + '/api/design/tokens', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + ADMIN_TOKEN
+    },
+    body: JSON.stringify(DESIGN_TOKENS)
+  });
 }
 </script>
 
