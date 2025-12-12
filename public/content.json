@@ -1,4 +1,11 @@
 {
+  "site": {
+    "title": "Service Homepage"
+  },
+  "navigation": [
+    { "label": "홈", "target": "hero", "enabled": true },
+    { "label": "서비스", "target": "service", "enabled": true }
+  ],
   "sections": [
     {
       "id": "hero",
@@ -17,11 +24,7 @@
       "order": 2,
       "content": {
         "title": "이렇게 작동합니다",
-        "items": [
-          "바로 시작",
-          "단순한 구조",
-          "유연한 확장"
-        ]
+        "items": ["바로 시작", "단순한 구조", "유연한 확장"]
       }
     }
   ]
