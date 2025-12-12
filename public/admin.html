@@ -15,19 +15,25 @@ body {
 .hidden { display:none; }
 .box {
   background:#fff;
-  border-radius:8px;
+  border-radius:10px;
   padding:16px;
   margin-bottom:16px;
+  border:1px solid #e5e7eb;
 }
 h1,h2,h3 { margin-top:0; }
 button {
-  padding:6px 12px;
+  padding:8px 14px;
   cursor:pointer;
 }
 button.primary {
   background:#111;
   color:#fff;
   border:none;
+}
+button.danger {
+  background:#fee;
+  border:1px solid #f99;
+  color:#900;
 }
 input, textarea, select {
   width:100%;
@@ -39,7 +45,7 @@ textarea { font-family:monospace; }
 .tabs button { margin-right:6px; }
 .section-item {
   border:1px solid #e5e7eb;
-  border-radius:6px;
+  border-radius:8px;
   padding:12px;
   margin-bottom:12px;
 }
@@ -49,14 +55,25 @@ textarea { font-family:monospace; }
   flex-wrap:wrap;
 }
 pre { font-size:13px; }
+.footer-save {
+  position:sticky;
+  bottom:0;
+  background:#f5f6f8;
+  padding-top:12px;
+}
+.badge {
+  font-size:12px;
+  padding:2px 6px;
+  border-radius:6px;
+  background:#111;
+  color:#fff;
+}
 </style>
 </head>
 
 <body>
 
-<!-- ===============================
-     LOGIN
-================================ -->
+<!-- ================= LOGIN ================= -->
 <div id="loginBox" class="box">
   <h2>Admin Login</h2>
   <label>ID
@@ -65,13 +82,12 @@ pre { font-size:13px; }
   <label>Password
     <input id="loginPw" type="password" />
   </label>
+  <br>
   <button class="primary" onclick="login()">로그인</button>
   <pre id="loginStatus"></pre>
 </div>
 
-<!-- ===============================
-     ADMIN
-================================ -->
+<!-- ================= ADMIN ================= -->
 <div id="adminBox" class="hidden">
 
 <h1>Homepage Admin</h1>
@@ -80,7 +96,6 @@ pre { font-size:13px; }
   <button onclick="showTab('content')">콘텐츠</button>
   <button onclick="showTab('json')">JSON</button>
   <button onclick="showTab('design')">디자인</button>
-  <button class="primary" onclick="saveContent()">저장</button>
   <button onclick="logout()">로그아웃</button>
 </div>
 
@@ -94,9 +109,7 @@ pre { font-size:13px; }
 </div>
 
 <script>
-/* =========================================================
-   ENV
-========================================================= */
+/* ================= ENV ================= */
 const API = 'https://young-sunset-d631.koolee1372.workers.dev';
 let TOKEN = localStorage.getItem('ADMIN_TOKEN');
 
@@ -104,25 +117,20 @@ let PAGE_DATA = null;
 let DESIGN_TOKENS = null;
 let DESIGN_META = null;
 
-/* =========================================================
-   INIT
-========================================================= */
+/* ================= INIT ================= */
 if (TOKEN) initAdmin();
 else showLogin();
 
 function showLogin() {
   loginBox.classList.remove('hidden');
 }
-
 function initAdmin() {
   loginBox.classList.add('hidden');
   adminBox.classList.remove('hidden');
   loadAll();
 }
 
-/* =========================================================
-   AUTH
-========================================================= */
+/* ================= AUTH ================= */
 function login() {
   fetch(API + '/api/admin/login', {
     method:'POST',
@@ -140,15 +148,12 @@ function login() {
   })
   .catch(() => loginStatus.textContent='❌ 로그인 실패');
 }
-
 function logout() {
   localStorage.removeItem('ADMIN_TOKEN');
   location.reload();
 }
 
-/* =========================================================
-   LOAD
-========================================================= */
+/* ================= LOAD ================= */
 function loadAll() {
   Promise.all([
     fetch(API + '/api/content').then(r=>r.json()),
@@ -164,24 +169,21 @@ function loadAll() {
   });
 }
 
-/* =========================================================
-   TABS
-========================================================= */
+/* ================= TABS ================= */
 function showTab(tab) {
   ['contentTab','jsonTab','designTab']
     .forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById(tab+'Tab').classList.remove('hidden');
 }
 
-/* =========================================================
-   CONTENT TAB
-========================================================= */
+/* ================= CONTENT ================= */
 function renderContent() {
   contentTab.innerHTML = `
-    <h2>콘텐츠</h2>
+    <h2>콘텐츠 관리</h2>
+
     ${PAGE_DATA.sections.map((s,i)=>`
       <div class="section-item">
-        <strong>${s.type}</strong>
+        <strong>${s.type.toUpperCase()}</strong>
 
         <label>
           활성
@@ -194,42 +196,35 @@ function renderContent() {
             oninput="updateTitle(${i},this.value)">
         </label>
 
+        ${s.content?.subtitle !== undefined ? `
         <label>부제목
-          <input value="${s.content?.subtitle||''}"
+          <input value="${s.content.subtitle||''}"
             oninput="updateSubtitle(${i},this.value)">
-        </label>
-
-        <label>이미지 URL
-          <input value="${s.media?.url||''}"
-            oninput="updateImage(${i},this.value)">
-        </label>
+        </label>` : ''}
 
         <div class="row">
           <button onclick="move(${i},-1)">▲</button>
           <button onclick="move(${i},1)">▼</button>
-          <button onclick="removeSection(${i})">삭제</button>
+          <button class="danger" onclick="removeSection(${i})">삭제</button>
         </div>
       </div>
     `).join('')}
+
     <button onclick="addSection()">+ 섹션 추가</button>
+
+    <div class="footer-save">
+      <button class="primary" onclick="saveContent()">저장하기</button>
+    </div>
   `;
 }
 
 function preview() {
-  window.opener?.postMessage({
-    type:'PREVIEW',
-    data:PAGE_DATA
-  },'*');
+  window.postMessage({ type:'PREVIEW', data:PAGE_DATA }, '*');
 }
 
 function toggle(i,v){ PAGE_DATA.sections[i].enabled=v; preview(); }
 function updateTitle(i,v){ PAGE_DATA.sections[i].content.title=v; preview(); }
 function updateSubtitle(i,v){ PAGE_DATA.sections[i].content.subtitle=v; preview(); }
-function updateImage(i,v){
-  PAGE_DATA.sections[i].media = PAGE_DATA.sections[i].media||{};
-  PAGE_DATA.sections[i].media.url=v;
-  preview();
-}
 
 function move(i,d){
   const t=i+d;
@@ -241,34 +236,53 @@ function move(i,d){
 }
 
 function removeSection(i){
-  if(!confirm('삭제?'))return;
+  if(!confirm('이 섹션을 삭제하시겠습니까?'))return;
   PAGE_DATA.sections.splice(i,1);
   PAGE_DATA.sections.forEach((s,idx)=>s.order=idx+1);
   renderContent(); preview();
 }
 
 function addSection(){
+  const type = prompt('섹션 타입 (hero, cards, list, cta, faq, pricing)');
+  if(!type) return;
   PAGE_DATA.sections.push({
     id:'section-'+Date.now(),
-    type:'hero',
+    type,
     enabled:true,
     order:PAGE_DATA.sections.length+1,
-    content:{title:'새 섹션',subtitle:''},
-    media:{ratio:'16-9'}
+    content:{ title:'새 섹션' },
+    options:{},
+    media:{ ratio:'16-9' }
   });
   renderContent(); preview();
 }
 
-/* =========================================================
-   JSON TAB
-========================================================= */
+/* ================= SAVE CONTENT ================= */
+function saveContent(){
+  if(!confirm('콘텐츠를 저장하시겠습니까?')) return;
+
+  status.textContent = '저장 중입니다...';
+
+  fetch(API+'/api/content',{
+    method:'POST',
+    headers:{
+      'Authorization':'Bearer '+TOKEN,
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify(PAGE_DATA)
+  })
+  .then(r=>r.ok?'✅ 저장되었습니다':'❌ 저장 실패')
+  .then(msg=>status.textContent=msg);
+}
+
+/* ================= JSON ================= */
 function renderJSON() {
   jsonTab.innerHTML = `
     <h2>Content JSON</h2>
-    <textarea id="jsonEditor" rows="20">
+    <textarea id="jsonEditor" rows="22">
 ${JSON.stringify(PAGE_DATA,null,2)}
     </textarea>
-    <button onclick="applyJSON()">적용</button>
+    <button onclick="applyJSON()">JSON 적용</button>
   `;
 }
 
@@ -276,14 +290,12 @@ function applyJSON(){
   try{
     PAGE_DATA = JSON.parse(jsonEditor.value);
     renderContent(); preview();
-  }catch(e){
+  }catch{
     alert('JSON 오류');
   }
 }
 
-/* =========================================================
-   DESIGN TAB
-========================================================= */
+/* ================= DESIGN ================= */
 function renderDesign() {
   designTab.innerHTML = `
     <h2>디자인 토큰</h2>
@@ -296,29 +308,32 @@ ${JSON.stringify(DESIGN_TOKENS,null,2)}
     <h3>버전</h3>
     ${(DESIGN_META.versions||[]).map(v=>`
       <div>
-        <strong>${v.id}</strong> (${v.createdAt})
+        <strong>${v.id}</strong>
+        ${v.id===DESIGN_META.current ? '<span class="badge">현재</span>' : ''}
+        (${v.createdAt})
         ${v.id!==DESIGN_META.current ? `
           <button onclick="rollback('${v.id}')">롤백</button>
           <button onclick="deleteVersion('${v.id}')">삭제</button>
-        ` : '<em> (현재)</em>'}
+        ` : ''}
       </div>
     `).join('')}
   `;
 }
 
 function saveDesign(){
-  DESIGN_TOKENS = JSON.parse(designEditor.value);
+  if(!confirm('디자인을 저장하시겠습니까?')) return;
   fetch(API+'/api/design/tokens',{
     method:'POST',
     headers:{
       'Authorization':'Bearer '+TOKEN,
       'Content-Type':'application/json'
     },
-    body:JSON.stringify(DESIGN_TOKENS)
+    body:JSON.stringify(JSON.parse(designEditor.value))
   }).then(()=>loadAll());
 }
 
 function rollback(id){
+  if(!confirm(id+'로 롤백할까요?')) return;
   fetch(API+'/api/design/rollback/'+id,{
     method:'POST',
     headers:{'Authorization':'Bearer '+TOKEN}
@@ -326,25 +341,11 @@ function rollback(id){
 }
 
 function deleteVersion(id){
-  if(!confirm('삭제?'))return;
+  if(!confirm('이 버전을 삭제할까요?')) return;
   fetch(API+'/api/design/delete/'+id,{
     method:'POST',
     headers:{'Authorization':'Bearer '+TOKEN}
   }).then(()=>loadAll());
-}
-
-/* =========================================================
-   SAVE CONTENT
-========================================================= */
-function saveContent(){
-  fetch(API+'/api/content',{
-    method:'POST',
-    headers:{
-      'Authorization':'Bearer '+TOKEN,
-      'Content-Type':'application/json'
-    },
-    body:JSON.stringify(PAGE_DATA)
-  }).then(()=>status.textContent='✅ 저장 완료');
 }
 </script>
 
