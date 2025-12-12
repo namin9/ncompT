@@ -7,301 +7,257 @@
 
   <style>
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: system-ui, sans-serif;
       background: #f5f6f8;
       margin: 0;
       padding: 24px;
     }
-
-    h1 {
-      margin-top: 0;
-    }
-
+    h1 { margin-top: 0; }
     button {
-      padding: 8px 14px;
-      margin-right: 6px;
+      padding: 6px 12px;
+      margin-right: 4px;
       border: 1px solid #ccc;
       background: #fff;
       cursor: pointer;
     }
-
     button.primary {
       background: #111;
       color: #fff;
-      border-color: #111;
     }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    hr {
-      margin: 20px 0;
-    }
-
     .section-box {
       background: #fff;
       border: 1px solid #ddd;
       padding: 12px;
-      margin-bottom: 12px;
+      margin-bottom: 16px;
     }
-
-    .section-box strong {
-      display: block;
-      margin-bottom: 6px;
-    }
-
-    input[type="text"],
-    input[type="number"],
-    textarea {
-      width: 100%;
-      padding: 6px;
-      box-sizing: border-box;
-      margin-top: 4px;
-    }
-
-    textarea {
-      height: 420px;
-      font-family: monospace;
-    }
-
     label {
       display: block;
+      margin-top: 6px;
+      font-size: 14px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 6px;
+      margin-top: 4px;
+      box-sizing: border-box;
+    }
+    textarea {
+      height: 380px;
+      font-family: monospace;
+    }
+    .hidden { display: none; }
+    .card-box {
+      border: 1px dashed #ccc;
+      padding: 8px;
       margin-top: 8px;
-      font-size: 14px;
     }
-
-    #status {
-      margin-top: 12px;
-      white-space: pre-wrap;
-      font-size: 14px;
-    }
-
-    .hidden {
-      display: none;
-    }
+    #status { margin-top: 12px; }
   </style>
 </head>
+
 <body>
 
-  <h1>Homepage Admin</h1>
+<h1>Homepage Admin</h1>
 
-  <div>
-    <button onclick="showTab('form')">폼 편집</button>
-    <button onclick="showTab('raw')">JSON 편집</button>
-    <button class="primary" onclick="save()">저장</button>
-  </div>
+<div>
+  <button onclick="showTab('form')">폼 편집</button>
+  <button onclick="showTab('raw')">JSON 편집</button>
+  <button class="primary" onclick="save()">저장</button>
+</div>
 
-  <hr />
+<hr/>
 
-  <div id="formTab"></div>
-  <div id="rawTab" class="hidden"></div>
+<div id="formTab"></div>
+<div id="rawTab" class="hidden"></div>
 
-  <pre id="status"></pre>
+<pre id="status"></pre>
 
-  <script>
-    /************************************************************
-     * 🔧 환경 설정 (반드시 수정)
-     ************************************************************/
-    const API_BASE_URL = 'https://young-sunset-d631.koolee1372.workers.dev/api/content';
-    const ADMIN_TOKEN = 'ADMIN_SECRET';
+<script>
+/* ===============================
+   환경 설정 (중요)
+================================ */
+const API_BASE_URL = 'https://young-sunset-d631.koolee1372.workers.dev';
+const ADMIN_TOKEN = 'ADMIN_SECRET';
 
-    /************************************************************
-     * 전역 상태
-     ************************************************************/
-    let contentData = null;
-    let currentTab = 'form';
+/* ===============================
+   상태
+================================ */
+let contentData = null;
+let currentTab = 'form';
 
-    /************************************************************
-     * 초기 로딩
-     ************************************************************/
-    fetch(API_BASE_URL + '/api/content')
-      .then(res => res.json())
-      .then(data => {
-        contentData = data;
-        renderFormEditor(data);
-        renderRawEditor(data);
-      })
-      .catch(err => {
-        document.getElementById('status').textContent =
-          '콘텐츠 로딩 실패: ' + err.message;
-      });
+/* ===============================
+   Load
+================================ */
+fetch(API_BASE_URL + '/api/content')
+  .then(res => res.json())
+  .then(data => {
+    contentData = data;
+    renderFormEditor();
+    renderRawEditor();
+  })
+  .catch(e => {
+    document.getElementById('status').textContent = e.message;
+  });
 
-    /************************************************************
-     * 탭 전환
-     ************************************************************/
-    function showTab(tab) {
-      currentTab = tab;
-      document.getElementById('formTab').classList.toggle('hidden', tab !== 'form');
-      document.getElementById('rawTab').classList.toggle('hidden', tab !== 'raw');
-    }
+/* ===============================
+   Tabs
+================================ */
+function showTab(tab) {
+  currentTab = tab;
+  document.getElementById('formTab').classList.toggle('hidden', tab !== 'form');
+  document.getElementById('rawTab').classList.toggle('hidden', tab !== 'raw');
+}
 
-    /************************************************************
-     * Raw JSON 편집기
-     ************************************************************/
-    function renderRawEditor(data) {
-      document.getElementById('rawTab').innerHTML = `
-        <h3>전체 JSON 편집</h3>
-        <textarea id="rawEditor">${JSON.stringify(data, null, 2)}</textarea>
-      `;
-    }
+/* ===============================
+   Raw Editor
+================================ */
+function renderRawEditor() {
+  document.getElementById('rawTab').innerHTML = `
+    <h3>전체 JSON</h3>
+    <textarea id="rawEditor">${JSON.stringify(contentData, null, 2)}</textarea>
+  `;
+}
 
-    /************************************************************
-     * 폼 기반 편집기
-     ************************************************************/
-    function renderFormEditor(data) {
-      const html = data.sections
-        .sort((a, b) => a.order - b.order)
-        .map((sec, secIdx) => {
-    
-          let cardUI = '';
-    
-          // 카드형 섹션인 경우
-          if (sec.content && Array.isArray(sec.content.cards)) {
-            cardUI = `
-              <div style="margin-top:12px;padding-left:12px;border-left:3px solid #eee;">
-                <strong>카드 관리</strong>
-    
-                ${sec.content.cards.map((card, cardIdx) => `
-                  <div style="margin-top:8px;padding:8px;border:1px dashed #ccc;">
-                    <label>
-                      활성
-                      <input type="checkbox"
-                        ${card.enabled ? 'checked' : ''}
-                        onchange="contentData.sections[${secIdx}]
-                          .content.cards[${cardIdx}].enabled=this.checked">
-                    </label>
-    
-                    <label>
-                      카드 제목
-                      <input type="text"
-                        value="${card.title}"
-                        onchange="contentData.sections[${secIdx}]
-                          .content.cards[${cardIdx}].title=this.value">
-                    </label>
-    
-                    <label>
-                      카드 설명
-                      <input type="text"
-                        value="${card.desc}"
-                        onchange="contentData.sections[${secIdx}]
-                          .content.cards[${cardIdx}].desc=this.value">
-                    </label>
-    
-                    <button onclick="moveCard(${secIdx}, ${cardIdx}, -1)">▲</button>
-                    <button onclick="moveCard(${secIdx}, ${cardIdx}, 1)">▼</button>
-                  </div>
-                `).join('')}
-    
-                <button onclick="addCard(${secIdx})">+ 카드 추가</button>
-              </div>
-            `;
-          }
-    
-          return `
-            <div class="section-box">
-              <strong>${sec.id} (${sec.type})</strong>
-    
+/* ===============================
+   Form Editor
+================================ */
+function renderFormEditor() {
+  const html = contentData.sections
+    .sort((a,b)=>a.order-b.order)
+    .map((sec, sIdx) => {
+
+      const cardsUI = Array.isArray(sec.content?.cards)
+        ? sec.content.cards.map((c, cIdx) => `
+            <div class="card-box">
               <label>
-                섹션 활성
-                <input type="checkbox"
-                  ${sec.enabled ? 'checked' : ''}
-                  onchange="contentData.sections[${secIdx}].enabled=this.checked">
+                활성
+                <input type="checkbox" ${c.enabled?'checked':''}
+                  onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].enabled=this.checked">
               </label>
-    
-              <label>
-                순서
-                <input type="number"
-                  value="${sec.order}"
-                  onchange="contentData.sections[${secIdx}].order=Number(this.value)">
+              <label>카드 제목
+                <input value="${c.title}"
+                  onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].title=this.value">
               </label>
-    
-              <label>
-                섹션 제목
-                <input type="text"
-                  value="${sec.content?.title || ''}"
-                  onchange="contentData.sections[${secIdx}].content.title=this.value">
+              <label>카드 설명
+                <input value="${c.desc}"
+                  onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].desc=this.value">
               </label>
-    
-              ${cardUI}
+              <button onclick="moveCard(${sIdx},${cIdx},-1)">▲</button>
+              <button onclick="moveCard(${sIdx},${cIdx},1)">▼</button>
             </div>
-          `;
-        })
-        .join('');
-    
-      document.getElementById('formTab').innerHTML = `
-        <h3>섹션 & 카드 편집</h3>
-        ${html}
+          `).join('')
+        : '';
+
+      return `
+        <div class="section-box">
+          <strong>${sec.id} (${sec.type})</strong>
+
+          <label>
+            섹션 활성
+            <input type="checkbox" ${sec.enabled?'checked':''}
+              onchange="contentData.sections[${sIdx}].enabled=this.checked">
+          </label>
+
+          <label>순서
+            <input type="number" value="${sec.order}"
+              onchange="contentData.sections[${sIdx}].order=Number(this.value)">
+          </label>
+
+          <label>섹션 제목
+            <input value="${sec.content?.title||''}"
+              onchange="contentData.sections[${sIdx}].content.title=this.value">
+          </label>
+
+          ${cardsUI}
+
+          ${Array.isArray(sec.content?.cards) ? `
+            <button onclick="addCard(${sIdx})">+ 카드 추가</button>
+
+            <hr/>
+
+            <strong>레이아웃 옵션</strong>
+            <label>
+              레이아웃
+              <select onchange="
+                contentData.sections[${sIdx}].options =
+                  contentData.sections[${sIdx}].options || {};
+                contentData.sections[${sIdx}].options.layout=this.value
+              ">
+                <option value="grid" ${(sec.options?.layout!=='slider')?'selected':''}>Grid</option>
+                <option value="slider" ${(sec.options?.layout==='slider')?'selected':''}>Slider</option>
+              </select>
+            </label>
+
+            <label>
+              슬라이드 자동재생
+              <input type="checkbox" ${sec.options?.slider?.enabled?'checked':''}
+                onchange="
+                  contentData.sections[${sIdx}].options.slider =
+                    contentData.sections[${sIdx}].options.slider || {};
+                  contentData.sections[${sIdx}].options.slider.enabled=this.checked
+                ">
+            </label>
+
+            <label>
+              슬라이드 간격(ms)
+              <input type="number" value="${sec.options?.slider?.interval||4000}"
+                onchange="
+                  contentData.sections[${sIdx}].options.slider =
+                    contentData.sections[${sIdx}].options.slider || {};
+                  contentData.sections[${sIdx}].options.slider.interval=Number(this.value)
+                ">
+            </label>
+          ` : ''}
+        </div>
       `;
-    }
-    /************************************************************
-     * 저장 (KV 반영)
-     ************************************************************/
-    function save() {
-      let dataToSave = contentData;
+    }).join('');
 
-      if (currentTab === 'raw') {
-        const raw = document.getElementById('rawEditor').value;
-        try {
-          dataToSave = JSON.parse(raw);
-        } catch (e) {
-          alert('JSON 형식 오류');
-          return;
-        }
-      }
+  document.getElementById('formTab').innerHTML = `<h3>섹션 편집</h3>${html}`;
+}
 
-      fetch(API_BASE_URL + '/api/content', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + ADMIN_TOKEN
-        },
-        body: JSON.stringify(dataToSave)
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('저장 실패');
-          return res.json();
-        })
-        .then(() => {
-          contentData = dataToSave;
-          renderFormEditor(contentData);
-          renderRawEditor(contentData);
-          document.getElementById('status').textContent =
-            '✅ 저장 완료 — 메인 페이지에 즉시 반영됩니다.';
-        })
-        .catch(err => {
-          document.getElementById('status').textContent =
-            '❌ 오류: ' + err.message;
-        });
-    }
+/* ===============================
+   Card Helpers
+================================ */
+function addCard(sIdx) {
+  contentData.sections[sIdx].content.cards.push({
+    id:'card-'+Date.now(),
+    title:'새 카드',
+    desc:'',
+    enabled:true
+  });
+  renderFormEditor();
+}
+function moveCard(sIdx,cIdx,d) {
+  const cards = contentData.sections[sIdx].content.cards;
+  const t = cIdx+d;
+  if(t<0||t>=cards.length) return;
+  [cards[cIdx],cards[t]]=[cards[t],cards[cIdx]];
+  renderFormEditor();
+}
 
-    function addCard(sectionIndex) {
-      const cards = contentData.sections[sectionIndex].content.cards;
-    
-      cards.push({
-        id: 'card-' + Date.now(),
-        title: '새 카드',
-        desc: '',
-        enabled: true
-      });
-    
-      renderFormEditor(contentData);
-    }
-    
-    function moveCard(sectionIndex, cardIndex, direction) {
-      const cards = contentData.sections[sectionIndex].content.cards;
-      const targetIndex = cardIndex + direction;
-    
-      if (targetIndex < 0 || targetIndex >= cards.length) return;
-    
-      const temp = cards[cardIndex];
-      cards[cardIndex] = cards[targetIndex];
-      cards[targetIndex] = temp;
-    
-      renderFormEditor(contentData);
-    }
-  </script>
+/* ===============================
+   Save
+================================ */
+function save() {
+  if (currentTab==='raw') {
+    try {
+      contentData = JSON.parse(document.getElementById('rawEditor').value);
+    } catch(e){ alert('JSON 오류'); return; }
+  }
+
+  fetch(API_BASE_URL + '/api/content',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer '+ADMIN_TOKEN
+    },
+    body:JSON.stringify(contentData)
+  })
+  .then(r=>r.ok?r.json():Promise.reject())
+  .then(()=>document.getElementById('status').textContent='✅ 저장 완료')
+  .catch(()=>document.getElementById('status').textContent='❌ 저장 실패');
+}
+</script>
 
 </body>
 </html>
