@@ -151,47 +151,90 @@
      * 폼 기반 편집기
      ************************************************************/
     function renderFormEditor(data) {
-      if (!data.sections) {
-        document.getElementById('formTab').innerHTML = 'sections 없음';
-        return;
-      }
-
       const html = data.sections
         .sort((a, b) => a.order - b.order)
-        .map((sec, idx) => `
-          <div class="section-box">
-            <strong>${sec.id} (${sec.type})</strong>
-
-            <label>
-              활성화
-              <input type="checkbox"
-                ${sec.enabled ? 'checked' : ''}
-                onchange="contentData.sections[${idx}].enabled=this.checked">
-            </label>
-
-            <label>
-              순서
-              <input type="number"
-                value="${sec.order}"
-                onchange="contentData.sections[${idx}].order=Number(this.value)">
-            </label>
-
-            <label>
-              제목
-              <input type="text"
-                value="${sec.content?.title || ''}"
-                onchange="contentData.sections[${idx}].content.title=this.value">
-            </label>
-          </div>
-        `)
+        .map((sec, secIdx) => {
+    
+          let cardUI = '';
+    
+          // 카드형 섹션인 경우
+          if (sec.content && Array.isArray(sec.content.cards)) {
+            cardUI = `
+              <div style="margin-top:12px;padding-left:12px;border-left:3px solid #eee;">
+                <strong>카드 관리</strong>
+    
+                ${sec.content.cards.map((card, cardIdx) => `
+                  <div style="margin-top:8px;padding:8px;border:1px dashed #ccc;">
+                    <label>
+                      활성
+                      <input type="checkbox"
+                        ${card.enabled ? 'checked' : ''}
+                        onchange="contentData.sections[${secIdx}]
+                          .content.cards[${cardIdx}].enabled=this.checked">
+                    </label>
+    
+                    <label>
+                      카드 제목
+                      <input type="text"
+                        value="${card.title}"
+                        onchange="contentData.sections[${secIdx}]
+                          .content.cards[${cardIdx}].title=this.value">
+                    </label>
+    
+                    <label>
+                      카드 설명
+                      <input type="text"
+                        value="${card.desc}"
+                        onchange="contentData.sections[${secIdx}]
+                          .content.cards[${cardIdx}].desc=this.value">
+                    </label>
+    
+                    <button onclick="moveCard(${secIdx}, ${cardIdx}, -1)">▲</button>
+                    <button onclick="moveCard(${secIdx}, ${cardIdx}, 1)">▼</button>
+                  </div>
+                `).join('')}
+    
+                <button onclick="addCard(${secIdx})">+ 카드 추가</button>
+              </div>
+            `;
+          }
+    
+          return `
+            <div class="section-box">
+              <strong>${sec.id} (${sec.type})</strong>
+    
+              <label>
+                섹션 활성
+                <input type="checkbox"
+                  ${sec.enabled ? 'checked' : ''}
+                  onchange="contentData.sections[${secIdx}].enabled=this.checked">
+              </label>
+    
+              <label>
+                순서
+                <input type="number"
+                  value="${sec.order}"
+                  onchange="contentData.sections[${secIdx}].order=Number(this.value)">
+              </label>
+    
+              <label>
+                섹션 제목
+                <input type="text"
+                  value="${sec.content?.title || ''}"
+                  onchange="contentData.sections[${secIdx}].content.title=this.value">
+              </label>
+    
+              ${cardUI}
+            </div>
+          `;
+        })
         .join('');
-
+    
       document.getElementById('formTab').innerHTML = `
-        <h3>섹션별 폼 편집</h3>
+        <h3>섹션 & 카드 편집</h3>
         ${html}
       `;
     }
-
     /************************************************************
      * 저장 (KV 반영)
      ************************************************************/
