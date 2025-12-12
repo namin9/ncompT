@@ -13,9 +13,10 @@
       padding: 24px;
     }
     h1 { margin-top: 0; }
+
     button {
       padding: 6px 12px;
-      margin-right: 4px;
+      margin-right: 6px;
       border: 1px solid #ccc;
       background: #fff;
       cursor: pointer;
@@ -23,35 +24,49 @@
     button.primary {
       background: #111;
       color: #fff;
+      border-color: #111;
     }
+
+    hr { margin: 20px 0; }
+
     .section-box {
       background: #fff;
       border: 1px solid #ddd;
       padding: 12px;
       margin-bottom: 16px;
     }
+
     label {
       display: block;
       margin-top: 6px;
       font-size: 14px;
     }
+
     input, textarea, select {
       width: 100%;
       padding: 6px;
       margin-top: 4px;
       box-sizing: border-box;
     }
+
     textarea {
       height: 380px;
       font-family: monospace;
     }
-    .hidden { display: none; }
+
     .card-box {
       border: 1px dashed #ccc;
       padding: 8px;
       margin-top: 8px;
     }
-    #status { margin-top: 12px; }
+
+    .hidden { display: none; }
+
+    #status {
+      margin-top: 12px;
+      white-space: pre-wrap;
+      font-size: 14px;
+    }
   </style>
 </head>
 
@@ -62,6 +77,7 @@
 <div>
   <button onclick="showTab('form')">폼 편집</button>
   <button onclick="showTab('raw')">JSON 편집</button>
+  <button onclick="showTab('design')">디자인(CSS)</button>
   <button class="primary" onclick="save()">저장</button>
 </div>
 
@@ -69,12 +85,13 @@
 
 <div id="formTab"></div>
 <div id="rawTab" class="hidden"></div>
+<div id="designTab" class="hidden"></div>
 
 <pre id="status"></pre>
 
 <script>
 /* ===============================
-   환경 설정 (중요)
+   환경 설정
 ================================ */
 const API_BASE_URL = 'https://young-sunset-d631.koolee1372.workers.dev';
 const ADMIN_TOKEN = 'ADMIN_SECRET';
@@ -86,7 +103,7 @@ let contentData = null;
 let currentTab = 'form';
 
 /* ===============================
-   Load
+   초기 로딩
 ================================ */
 fetch(API_BASE_URL + '/api/content')
   .then(res => res.json())
@@ -95,31 +112,38 @@ fetch(API_BASE_URL + '/api/content')
     renderFormEditor();
     renderRawEditor();
   })
-  .catch(e => {
-    document.getElementById('status').textContent = e.message;
+  .catch(err => {
+    document.getElementById('status').textContent =
+      '콘텐츠 로딩 실패: ' + err.message;
   });
 
 /* ===============================
-   Tabs
+   탭 전환
 ================================ */
 function showTab(tab) {
   currentTab = tab;
-  document.getElementById('formTab').classList.toggle('hidden', tab !== 'form');
-  document.getElementById('rawTab').classList.toggle('hidden', tab !== 'raw');
+  ['formTab','rawTab','designTab'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+  document.getElementById(tab + 'Tab').classList.remove('hidden');
+
+  if (tab === 'design') {
+    renderDesignEditor();
+  }
 }
 
 /* ===============================
-   Raw Editor
+   Raw JSON 편집기
 ================================ */
 function renderRawEditor() {
   document.getElementById('rawTab').innerHTML = `
-    <h3>전체 JSON</h3>
+    <h3>전체 JSON 편집</h3>
     <textarea id="rawEditor">${JSON.stringify(contentData, null, 2)}</textarea>
   `;
 }
 
 /* ===============================
-   Form Editor
+   Form 편집기
 ================================ */
 function renderFormEditor() {
   const html = contentData.sections
@@ -128,24 +152,24 @@ function renderFormEditor() {
 
       const cardsUI = Array.isArray(sec.content?.cards)
         ? sec.content.cards.map((c, cIdx) => `
-            <div class="card-box">
-              <label>
-                활성
-                <input type="checkbox" ${c.enabled?'checked':''}
-                  onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].enabled=this.checked">
-              </label>
-              <label>카드 제목
-                <input value="${c.title}"
-                  onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].title=this.value">
-              </label>
-              <label>카드 설명
-                <input value="${c.desc}"
-                  onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].desc=this.value">
-              </label>
-              <button onclick="moveCard(${sIdx},${cIdx},-1)">▲</button>
-              <button onclick="moveCard(${sIdx},${cIdx},1)">▼</button>
-            </div>
-          `).join('')
+          <div class="card-box">
+            <label>
+              활성
+              <input type="checkbox" ${c.enabled?'checked':''}
+                onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].enabled=this.checked">
+            </label>
+            <label>카드 제목
+              <input value="${c.title}"
+                onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].title=this.value">
+            </label>
+            <label>카드 설명
+              <input value="${c.desc}"
+                onchange="contentData.sections[${sIdx}].content.cards[${cIdx}].desc=this.value">
+            </label>
+            <button onclick="moveCard(${sIdx},${cIdx},-1)">▲</button>
+            <button onclick="moveCard(${sIdx},${cIdx},1)">▼</button>
+          </div>
+        `).join('')
         : '';
 
       return `
@@ -212,11 +236,14 @@ function renderFormEditor() {
       `;
     }).join('');
 
-  document.getElementById('formTab').innerHTML = `<h3>섹션 편집</h3>${html}`;
+  document.getElementById('formTab').innerHTML = `
+    <h3>섹션 & 카드 편집</h3>
+    ${html}
+  `;
 }
 
 /* ===============================
-   Card Helpers
+   카드 유틸
 ================================ */
 function addCard(sIdx) {
   contentData.sections[sIdx].content.cards.push({
@@ -227,6 +254,7 @@ function addCard(sIdx) {
   });
   renderFormEditor();
 }
+
 function moveCard(sIdx,cIdx,d) {
   const cards = contentData.sections[sIdx].content.cards;
   const t = cIdx+d;
@@ -236,26 +264,63 @@ function moveCard(sIdx,cIdx,d) {
 }
 
 /* ===============================
-   Save
+   디자인(CSS) 편집기
+================================ */
+function renderDesignEditor() {
+  fetch(API_BASE_URL + '/api/style/main.css')
+    .then(res => res.text())
+    .then(css => {
+      document.getElementById('designTab').innerHTML = `
+        <h3>디자인 CSS 편집</h3>
+        <textarea id="cssEditor" style="height:420px;">${css}</textarea>
+        <br/>
+        <button class="primary" onclick="saveCSS()">CSS 저장</button>
+      `;
+    });
+}
+
+function saveCSS() {
+  fetch(API_BASE_URL + '/api/style/main.css', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + ADMIN_TOKEN,
+      'Content-Type': 'text/plain'
+    },
+    body: document.getElementById('cssEditor').value
+  })
+  .then(r => r.ok ? '✅ CSS 저장 완료 (새로고침 시 반영)' : '❌ CSS 저장 실패')
+  .then(msg => document.getElementById('status').textContent = msg)
+  .catch(() => {
+    document.getElementById('status').textContent = '❌ CSS 저장 중 오류';
+  });
+}
+
+/* ===============================
+   저장 (JSON)
 ================================ */
 function save() {
-  if (currentTab==='raw') {
+  if (currentTab === 'raw') {
     try {
       contentData = JSON.parse(document.getElementById('rawEditor').value);
-    } catch(e){ alert('JSON 오류'); return; }
+    } catch(e) {
+      alert('JSON 형식 오류');
+      return;
+    }
   }
 
-  fetch(API_BASE_URL + '/api/content',{
+  fetch(API_BASE_URL + '/api/content', {
     method:'POST',
     headers:{
       'Content-Type':'application/json',
-      'Authorization':'Bearer '+ADMIN_TOKEN
+      'Authorization':'Bearer ' + ADMIN_TOKEN
     },
     body:JSON.stringify(contentData)
   })
-  .then(r=>r.ok?r.json():Promise.reject())
-  .then(()=>document.getElementById('status').textContent='✅ 저장 완료')
-  .catch(()=>document.getElementById('status').textContent='❌ 저장 실패');
+  .then(r=>r.ok?'✅ 저장 완료':'❌ 저장 실패')
+  .then(msg => document.getElementById('status').textContent = msg)
+  .catch(()=> {
+    document.getElementById('status').textContent = '❌ 저장 중 오류';
+  });
 }
 </script>
 
