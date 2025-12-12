@@ -1,4 +1,4 @@
-fetch('/content.json')
+fetch('https://young-sunset-d631.koolee1372.workers.dev/api/content')
   .then(res => res.json())
   .then(data => {
     renderHeader(data.navigation);
