@@ -20,6 +20,12 @@ body {
   margin-bottom:16px;
   border:1px solid #e5e7eb;
 }
+.section-item {
+  border:1px dashed #d1d5db;
+  border-radius:8px;
+  padding:12px;
+  margin-bottom:12px;
+}
 h1,h2,h3,h4 { margin-top:0; }
 button {
   padding:8px 14px;
@@ -42,34 +48,22 @@ input, textarea, select {
   box-sizing:border-box;
 }
 textarea { font-family:monospace; }
-.tabs button { margin-right:6px; }
-.section-item {
-  border:1px solid #e5e7eb;
-  border-radius:8px;
-  padding:12px;
-  margin-bottom:12px;
-}
 .row {
   display:flex;
   gap:8px;
   flex-wrap:wrap;
-}
-pre { font-size:13px; }
-.footer-save {
-  position:sticky;
-  bottom:0;
-  background:#f5f6f8;
-  padding-top:12px;
-}
-.small {
-  font-size:13px;
-  color:#555;
 }
 .subbox {
   border:1px dashed #ddd;
   padding:10px;
   margin-top:8px;
   border-radius:6px;
+}
+.footer-save {
+  position:sticky;
+  bottom:0;
+  background:#f5f6f8;
+  padding-top:12px;
 }
 </style>
 </head>
@@ -92,7 +86,6 @@ pre { font-size:13px; }
 
 <!-- ADMIN -->
 <div id="adminBox" class="hidden">
-
 <h1>Homepage Admin</h1>
 
 <div class="tabs">
@@ -112,10 +105,8 @@ pre { font-size:13px; }
 </div>
 
 <script>
-/* ================= ENV ================= */
 const API = 'https://young-sunset-d631.koolee1372.workers.dev';
 let TOKEN = localStorage.getItem('ADMIN_TOKEN');
-
 let PAGE_DATA = null;
 let DESIGN_TOKENS = null;
 let DESIGN_META = null;
@@ -150,7 +141,6 @@ function logout(){
   localStorage.removeItem('ADMIN_TOKEN');
   location.reload();
 }
-
 /* ================= LOAD ================= */
 function loadAll(){
   Promise.all([
@@ -169,7 +159,7 @@ function loadAll(){
 
 /* ================= TABS ================= */
 function showTab(tab){
-  ['contentTab','jsonTab','designTab']
+  ['contentTab','jsonTab']
     .forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById(tab+'Tab').classList.remove('hidden');
 }
@@ -179,69 +169,124 @@ function preview(){
   window.postMessage({ type:'PREVIEW', data:PAGE_DATA },'*');
 }
 
+/* ================= SCHEMA ================= */
+function createSection(type){
+  const base = {
+    id:'section-'+Date.now(),
+    type,
+    enabled:true,
+    order:PAGE_DATA.sections.length+1,
+    media:{ ratio:'16-9', url:'' },
+    options:{},
+    content:{}
+  };
+  switch(type){
+    case 'hero':
+      base.content={ title:'', subtitle:'' };
+      break;
+    case 'cards':
+      base.content={ title:'', items:[] };
+      break;
+    case 'list':
+      base.content={ title:'', items:[] };
+      break;
+    case 'faq':
+      base.content={ title:'', items:[] };
+      break;
+    case 'pricing':
+      base.content={ title:'', items:[] };
+      break;
+    case 'cta':
+      base.content={ title:'', button:{label:'',action:''} };
+      break;
+  }
+  return base;
+}
+
 /* ================= CONTENT ================= */
 function renderContent(){
   contentTab.innerHTML = `
     <h2>콘텐츠 관리</h2>
 
-    ${PAGE_DATA.sections.map((s,i)=>`
-      <div class="section-item">
-        <h3>${s.type.toUpperCase()}</h3>
+    ${PAGE_DATA.sections.map((s,i)=>renderSection(s,i)).join('')}
 
-        ${renderCommonUI(s,i)}
-        ${renderTypeUI(s,i)}
-      </div>
-    `).join('')}
-
+    <label>새 섹션 타입</label>
+    <select id="newType">
+      <option value="hero">hero</option>
+      <option value="cards">cards</option>
+      <option value="list">list</option>
+      <option value="faq">faq</option>
+      <option value="pricing">pricing</option>
+      <option value="cta">cta</option>
+    </select>
     <button onclick="addSection()">+ 섹션 추가</button>
 
     <div class="footer-save">
-      <button class="primary" onclick="saveContent()">저장하기</button>
+      <button class="primary" onclick="save()">저장하기</button>
     </div>
   `;
 }
 
-function renderCommonUI(s,i){
+function renderSection(s,i){
   return `
+  <div class="section-item">
+    <h3>${s.type.toUpperCase()}</h3>
+
+    <label>타입 변경
+      <select onchange="changeType(${i},this.value)">
+        ${['hero','cards','list','faq','pricing','cta']
+          .map(t=>`<option value="${t}" ${s.type===t?'selected':''}>${t}</option>`).join('')}
+      </select>
+    </label>
+
     <label>
       활성
       <input type="checkbox" ${s.enabled?'checked':''}
-        onchange="PAGE_DATA.sections[${i}].enabled=this.checked;preview()">
+        onchange="setEnabled(${i},this.checked)">
     </label>
 
-    <label>제목
-      <input value="${s.content?.title||''}"
-        oninput="PAGE_DATA.sections[${i}].content.title=this.value;preview()">
-    </label>
+    ${renderTypeUI(s,i)}
 
     <div class="row">
       <button onclick="move(${i},-1)">▲</button>
       <button onclick="move(${i},1)">▼</button>
       <button class="danger" onclick="removeSection(${i})">삭제</button>
     </div>
-  `;
+  </div>`;
 }
 
 /* ================= TYPE UI ================= */
 function renderTypeUI(s,i){
   switch(s.type){
-
     case 'hero':
       return `
-        <label>부제목
-          <input value="${s.content?.subtitle||''}"
-            oninput="s.content.subtitle=this.value;preview()">
-        </label>
-
-        <label>미디어 비율
-          <select onchange="s.media.ratio=this.value;preview()">
-            <option ${s.media?.ratio==='16-9'?'selected':''}>16-9</option>
-            <option ${s.media?.ratio==='4-3'?'selected':''}>4-3</option>
-            <option ${s.media?.ratio==='1-1'?'selected':''}>1-1</option>
-          </select>
-        </label>
+        <label>제목 <input value="${s.content.title}" oninput="setContent(${i},'title',this.value)"></label>
+        <label>부제목 <input value="${s.content.subtitle}" oninput="setContent(${i},'subtitle',this.value)"></label>
+        ${mediaUI(i)}
       `;
-
+    case 'cta':
+      return `
+        <label>문구 <input value="${s.content.title}" oninput="setContent(${i},'title',this.value)"></label>
+        <label>버튼 텍스트 <input value="${s.content.button.label}" oninput="setCTA(${i},'label',this.value)"></label>
+        <label>버튼 링크 <input value="${s.content.button.action}" oninput="setCTA(${i},'action',this.value)"></label>
+      `;
+    case 'list':
+    case 'faq':
+      return `
+        <label>항목 (줄바꿈)</label>
+        <textarea oninput="setList(${i},this.value)">${s.content.items.map(it=>s.type==='faq'?it.q:it).join('\n')}</textarea>
+      `;
+    case 'pricing':
+      return `
+        ${s.content.items.map((p,pi)=>`
+          <div class="subbox">
+            <input placeholder="이름" value="${p.name||''}" oninput="setPrice(${i},${pi},'name',this.value)">
+            <input placeholder="가격" value="${p.price||''}" oninput="setPrice(${i},${pi},'price',this.value)">
+            <input placeholder="설명" value="${p.desc||''}" oninput="setPrice(${i},${pi},'desc',this.value)">
+            <button onclick="removeItem(${i},${pi})">삭제</button>
+          </div>`).join('')}
+        <button onclick="addPrice(${i})">+ 요금제 추가</button>
+      `;
     case 'cards':
       s.options = s.options||{};
       s.options.layout = s.options.layout||'grid';
@@ -255,7 +300,13 @@ function renderTypeUI(s,i){
             <option value="slider" ${s.options.layout==='slider'?'selected':''}>Slider</option>
           </select>
         </label>
-
+        <label>미디어 URL (임시)
+          <input
+            placeholder="https://example.com/image.jpg"
+            value="${s.media?.url || ''}"
+            oninput="updateMediaURL(${i}, this.value)"
+          >
+        </label>
         ${s.options.layout==='slider' ? `
           <label>
             자동 재생
@@ -280,59 +331,21 @@ function renderTypeUI(s,i){
         `).join('')}
         <button onclick="addItem(${i},{title:'',desc:''})">+ 카드 추가</button>
       `;
-
-    case 'list':
-    case 'faq':
-      s.content.items = s.content.items||[];
-      return `
-        <h4>${s.type==='faq'?'Q / A':'항목'}</h4>
-        ${s.content.items.map((it,ii)=>`
-          <div class="subbox">
-            <input placeholder="${s.type==='faq'?'질문':'항목'}"
-              value="${it.q||it||''}"
-              oninput="${s.type==='faq'?'it.q=this.value':'s.content.items['+ii+']=this.value'};preview()">
-            ${s.type==='faq'?`
-            <input placeholder="답변"
-              value="${it.a||''}"
-              oninput="it.a=this.value;preview()">`:''}
-            <button onclick="removeItem(${i},${ii})">삭제</button>
-          </div>
-        `).join('')}
-        <button onclick="addItem(${i},${s.type==='faq'?"{q:'',a:''}":"'"} )">+ 추가</button>
-      `;
-
-    case 'pricing':
-      s.content.items = s.content.items||[];
-      return `
-        <h4>요금제</h4>
-        ${s.content.items.map((p,pi)=>`
-          <div class="subbox">
-            <input placeholder="이름" value="${p.name||''}"
-              oninput="p.name=this.value;preview()">
-            <input placeholder="가격" value="${p.price||''}"
-              oninput="p.price=this.value;preview()">
-            <input placeholder="설명" value="${p.desc||''}"
-              oninput="p.desc=this.value;preview()">
-            <button onclick="removeItem(${i},${pi})">삭제</button>
-          </div>
-        `).join('')}
-        <button onclick="addItem(${i},{name:'',price:'',desc:''})">+ 요금제 추가</button>
-      `;
-
-    case 'cta':
-      s.content.button = s.content.button||{label:'',action:''};
-      return `
-        <label>버튼 텍스트
-          <input value="${s.content.button.label}"
-            oninput="s.content.button.label=this.value;preview()">
-        </label>
-        <label>버튼 링크
-          <input value="${s.content.button.action}"
-            oninput="s.content.button.action=this.value;preview()">
-        </label>
-      `;
   }
   return '';
+}
+
+function mediaUI(i){
+  const m=PAGE_DATA.sections[i].media;
+  return `
+    <label>미디어 비율
+      <select onchange="setMedia(${i},'ratio',this.value)">
+        ${['16-9','4-3','1-1'].map(r=>`<option ${m.ratio===r?'selected':''}>${r}</option>`).join('')}
+      </select>
+    </label>
+    <label>미디어 URL
+      <input value="${m.url||''}" oninput="setMedia(${i},'url',this.value)">
+    </label>`;
 }
 
 /* ================= ITEM HELPERS ================= */
@@ -375,10 +388,50 @@ function addSection(){
   renderContent(); preview();
 }
 
-/* ================= SAVE ================= */
-function saveContent(){
-  if(!confirm('콘텐츠를 저장하시겠습니까?'))return;
-  status.textContent='저장 중입니다...';
+/* ================= MUTATIONS ================= */
+function setEnabled(i,v){ PAGE_DATA.sections[i].enabled=v; preview(); }
+function setContent(i,k,v){ PAGE_DATA.sections[i].content[k]=v; preview(); }
+function setCTA(i,k,v){ PAGE_DATA.sections[i].content.button[k]=v; preview(); }
+function setMedia(i,k,v){ PAGE_DATA.sections[i].media[k]=v; preview(); }
+
+function setList(i,v){
+  const s=PAGE_DATA.sections[i];
+  s.content.items=v.split('\n').filter(Boolean)
+    .map(t=>s.type==='faq'?{q:t,a:''}:t);
+  preview();
+}
+
+function setPrice(i,pi,k,v){ PAGE_DATA.sections[i].content.items[pi][k]=v; preview(); }
+function setCard(i,ci,k,v){ PAGE_DATA.sections[i].content.items[ci][k]=v; preview(); }
+
+function addPrice(i){ PAGE_DATA.sections[i].content.items.push({name:'',price:'',desc:''}); renderContent(); }
+function addCard(i){ PAGE_DATA.sections[i].content.items.push({title:'',desc:''}); renderContent(); }
+function removeItem(i,ii){ PAGE_DATA.sections[i].content.items.splice(ii,1); renderContent(); }
+
+function changeType(i,type){
+  PAGE_DATA.sections[i]=createSection(type);
+  renderContent(); preview();
+}
+function move(i,d){
+  const t=i+d;
+  if(t<0||t>=PAGE_DATA.sections.length)return;
+  [PAGE_DATA.sections[i],PAGE_DATA.sections[t]]=[PAGE_DATA.sections[t],PAGE_DATA.sections[i]];
+  renderContent(); preview();
+}
+function removeSection(i){
+  if(!confirm('삭제할까요?'))return;
+  PAGE_DATA.sections.splice(i,1);
+  renderContent(); preview();
+}
+function addSection(){
+  const type=document.getElementById('newType').value;
+  PAGE_DATA.sections.push(createSection(type));
+  renderContent(); preview();
+}
+
+/* ================= SAVE / JSON ================= */
+function save(){
+  if(!confirm('저장하시겠습니까?'))return;
   fetch(API+'/api/content',{
     method:'POST',
     headers:{
@@ -386,18 +439,12 @@ function saveContent(){
       'Content-Type':'application/json'
     },
     body:JSON.stringify(PAGE_DATA)
-  })
-  .then(r=>r.ok?'✅ 저장되었습니다':'❌ 저장 실패')
-  .then(msg=>status.textContent=msg);
+  }).then(()=>status.textContent='✅ 저장 완료');
 }
-
-/* ================= JSON ================= */
 function renderJSON(){
   jsonTab.innerHTML=`
-    <h2>Content JSON</h2>
-    <textarea rows="22" id="jsonEditor">
-${JSON.stringify(PAGE_DATA,null,2)}
-    </textarea>
+    <h2>JSON</h2>
+    <textarea rows="22" id="jsonEditor">${JSON.stringify(PAGE_DATA,null,2)}</textarea>
     <button onclick="applyJSON()">적용</button>
   `;
 }
@@ -427,6 +474,11 @@ function saveDesign(){
     },
     body:JSON.stringify(JSON.parse(designEditor.value))
   }).then(()=>loadAll());
+}
+
+/* ================= PREVIEW ================= */
+function preview(){
+  window.postMessage({type:'PREVIEW',data:PAGE_DATA},'*');
 }
 </script>
 
