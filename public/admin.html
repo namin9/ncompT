@@ -234,9 +234,12 @@ function renderDesign(tokens, meta) {
     ${(meta.versions||[]).map(v=>`
       <div>
         <strong>${v.id}</strong> (${v.createdAt}) — ${v.memo}
-        <button onclick="rollback('${v.id}')">롤백</button>
+        ${v.id !== meta.current ? `
+          <button onclick="rollback('${v.id}')">롤백</button>
+          <button onclick="deleteVersion('${v.id}')">삭제</button>
+        ` : '<em> (현재)</em>'}
       </div>
-    `).join('')}
+    `).join('')
   `;
 }
 
@@ -287,6 +290,18 @@ function save() {
   .then(r=>r.ok?'✅ 저장 완료':'❌ 저장 실패')
   .then(msg=>status.textContent=msg);
 }
+
+function deleteVersion(id) {
+  if (!confirm(`${id} 버전을 삭제할까요? (되돌릴 수 없음)`)) return;
+
+  fetch(API + '/api/design/delete/' + id, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + TOKEN }
+  })
+  .then(r => r.ok ? '✅ 삭제 완료' : '❌ 삭제 실패')
+  .then(msg => status.textContent = msg);
+}
+
 </script>
 
 </body>
