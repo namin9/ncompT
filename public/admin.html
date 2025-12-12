@@ -1,267 +1,350 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>Homepage Admin</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8" />
+<title>Homepage Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <style>
-    body {
-      font-family: system-ui, sans-serif;
-      background: #f5f6f8;
-      margin: 0;
-      padding: 20px;
-    }
-    h1, h2, h3 { margin-top: 0; }
-    .box {
-      background: #fff;
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-    label {
-      display: block;
-      margin-top: 8px;
-      font-size: 14px;
-    }
-    input, textarea, select {
-      width: 100%;
-      padding: 6px;
-      box-sizing: border-box;
-      margin-top: 4px;
-    }
-    textarea {
-      font-family: monospace;
-      height: 240px;
-    }
-    button {
-      margin-top: 10px;
-      padding: 6px 12px;
-      cursor: pointer;
-    }
-    button.primary {
-      background: #111;
-      color: #fff;
-      border: none;
-    }
-    .row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .section-item {
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      padding: 12px;
-      margin-bottom: 12px;
-    }
-  </style>
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  background:#f5f6f8;
+  margin:0;
+  padding:20px;
+}
+.hidden { display:none; }
+.box {
+  background:#fff;
+  border-radius:8px;
+  padding:16px;
+  margin-bottom:16px;
+}
+h1,h2,h3 { margin-top:0; }
+button {
+  padding:6px 12px;
+  cursor:pointer;
+}
+button.primary {
+  background:#111;
+  color:#fff;
+  border:none;
+}
+input, textarea, select {
+  width:100%;
+  margin-top:4px;
+  padding:6px;
+  box-sizing:border-box;
+}
+textarea { font-family:monospace; }
+.tabs button { margin-right:6px; }
+.section-item {
+  border:1px solid #e5e7eb;
+  border-radius:6px;
+  padding:12px;
+  margin-bottom:12px;
+}
+.row {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+pre { font-size:13px; }
+</style>
 </head>
 
 <body>
 
+<!-- ===============================
+     LOGIN
+================================ -->
+<div id="loginBox" class="box">
+  <h2>Admin Login</h2>
+  <label>ID
+    <input id="loginId" />
+  </label>
+  <label>Password
+    <input id="loginPw" type="password" />
+  </label>
+  <button class="primary" onclick="login()">로그인</button>
+  <pre id="loginStatus"></pre>
+</div>
+
+<!-- ===============================
+     ADMIN
+================================ -->
+<div id="adminBox" class="hidden">
+
 <h1>Homepage Admin</h1>
 
-<!-- ===============================
-     CONTENT
-================================ -->
-<div class="box">
-  <h2>콘텐츠 관리</h2>
-  <div id="sections"></div>
-  <button onclick="addSection()">+ 섹션 추가</button>
+<div class="tabs">
+  <button onclick="showTab('content')">콘텐츠</button>
+  <button onclick="showTab('json')">JSON</button>
+  <button onclick="showTab('design')">디자인</button>
+  <button class="primary" onclick="saveContent()">저장</button>
+  <button onclick="logout()">로그아웃</button>
 </div>
 
-<!-- ===============================
-     DESIGN TOKENS
-================================ -->
-<div class="box">
-  <h2>디자인 토큰</h2>
-  <textarea id="tokenEditor"></textarea>
-  <button class="primary" onclick="saveTokens()">디자인 토큰 저장</button>
-</div>
+<hr/>
 
-<!-- ===============================
-     SAVE
-================================ -->
-<div class="box">
-  <button class="primary" onclick="saveContent()">💾 콘텐츠 저장</button>
+<div id="contentTab"></div>
+<div id="jsonTab" class="hidden"></div>
+<div id="designTab" class="hidden"></div>
+
+<pre id="status"></pre>
 </div>
 
 <script>
 /* =========================================================
    ENV
 ========================================================= */
-const API_BASE = 'https://young-sunset-d631.koolee1372.workers.dev';
-const ADMIN_TOKEN = 'ADMIN_SECRET';
+const API = 'https://young-sunset-d631.koolee1372.workers.dev';
+let TOKEN = localStorage.getItem('ADMIN_TOKEN');
 
 let PAGE_DATA = null;
 let DESIGN_TOKENS = null;
+let DESIGN_META = null;
 
 /* =========================================================
    INIT
 ========================================================= */
-Promise.all([
-  fetch(API_BASE + '/api/content').then(r => r.json()),
-  fetch(API_BASE + '/api/design/tokens').then(r => r.json())
-]).then(([content, tokens]) => {
-  PAGE_DATA = content;
-  DESIGN_TOKENS = tokens;
-  renderAdmin();
-});
+if (TOKEN) initAdmin();
+else showLogin();
 
-/* =========================================================
-   RENDER ADMIN
-========================================================= */
-function renderAdmin() {
-  renderSections();
-  tokenEditor.value = JSON.stringify(DESIGN_TOKENS, null, 2);
+function showLogin() {
+  loginBox.classList.remove('hidden');
+}
+
+function initAdmin() {
+  loginBox.classList.add('hidden');
+  adminBox.classList.remove('hidden');
+  loadAll();
 }
 
 /* =========================================================
-   SECTIONS
+   AUTH
 ========================================================= */
-function renderSections() {
-  const container = document.getElementById('sections');
-  container.innerHTML = '';
+function login() {
+  fetch(API + '/api/admin/login', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      id: loginId.value,
+      password: loginPw.value
+    })
+  })
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(res => {
+    TOKEN = res.token;
+    localStorage.setItem('ADMIN_TOKEN', TOKEN);
+    initAdmin();
+  })
+  .catch(() => loginStatus.textContent='❌ 로그인 실패');
+}
 
-  PAGE_DATA.sections
-    .sort((a,b)=>a.order-b.order)
-    .forEach((sec, idx) => {
-      const el = document.createElement('div');
-      el.className = 'section-item';
+function logout() {
+  localStorage.removeItem('ADMIN_TOKEN');
+  location.reload();
+}
 
-      el.innerHTML = `
-        <strong>${sec.type}</strong>
+/* =========================================================
+   LOAD
+========================================================= */
+function loadAll() {
+  Promise.all([
+    fetch(API + '/api/content').then(r=>r.json()),
+    fetch(API + '/api/design/tokens').then(r=>r.json()),
+    fetch(API + '/api/design/versions').then(r=>r.json())
+  ]).then(([c,t,m])=>{
+    PAGE_DATA=c;
+    DESIGN_TOKENS=t;
+    DESIGN_META=m;
+    renderContent();
+    renderJSON();
+    renderDesign();
+  });
+}
+
+/* =========================================================
+   TABS
+========================================================= */
+function showTab(tab) {
+  ['contentTab','jsonTab','designTab']
+    .forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById(tab+'Tab').classList.remove('hidden');
+}
+
+/* =========================================================
+   CONTENT TAB
+========================================================= */
+function renderContent() {
+  contentTab.innerHTML = `
+    <h2>콘텐츠</h2>
+    ${PAGE_DATA.sections.map((s,i)=>`
+      <div class="section-item">
+        <strong>${s.type}</strong>
 
         <label>
           활성
-          <input type="checkbox" ${sec.enabled?'checked':''}
-            onchange="toggleSection(${idx}, this.checked)">
+          <input type="checkbox" ${s.enabled?'checked':''}
+            onchange="toggle(${i},this.checked)">
         </label>
 
-        <label>
-          제목
-          <input value="${sec.content?.title || ''}"
-            oninput="updateTitle(${idx}, this.value)">
+        <label>제목
+          <input value="${s.content?.title||''}"
+            oninput="updateTitle(${i},this.value)">
         </label>
 
-        <label>
-          부제목
-          <input value="${sec.content?.subtitle || ''}"
-            oninput="updateSubtitle(${idx}, this.value)">
+        <label>부제목
+          <input value="${s.content?.subtitle||''}"
+            oninput="updateSubtitle(${i},this.value)">
         </label>
 
-        <label>
-          이미지 URL (R2 전제)
-          <input value="${sec.media?.url || ''}"
-            placeholder="https://..."
-            oninput="updateImage(${idx}, this.value)">
+        <label>이미지 URL
+          <input value="${s.media?.url||''}"
+            oninput="updateImage(${i},this.value)">
         </label>
 
         <div class="row">
-          <button onclick="moveSection(${idx}, -1)">▲</button>
-          <button onclick="moveSection(${idx}, 1)">▼</button>
-          <button onclick="removeSection(${idx})">삭제</button>
+          <button onclick="move(${i},-1)">▲</button>
+          <button onclick="move(${i},1)">▼</button>
+          <button onclick="removeSection(${i})">삭제</button>
         </div>
-      `;
-
-      container.appendChild(el);
-    });
+      </div>
+    `).join('')}
+    <button onclick="addSection()">+ 섹션 추가</button>
+  `;
 }
 
-/* =========================================================
-   SECTION OPERATIONS
-========================================================= */
-function addSection() {
-  PAGE_DATA.sections.push({
-    id: 'section-' + Date.now(),
-    type: 'hero',
-    enabled: true,
-    order: PAGE_DATA.sections.length + 1,
-    content: { title: '새 섹션', subtitle: '' },
-    media: { ratio: '16-9' }
-  });
-  renderSections();
-  preview();
-}
-
-function removeSection(i) {
-  if (!confirm('삭제할까요?')) return;
-  PAGE_DATA.sections.splice(i, 1);
-  reorder();
-  renderSections();
-  preview();
-}
-
-function moveSection(i, d) {
-  const t = i + d;
-  if (t < 0 || t >= PAGE_DATA.sections.length) return;
-  [PAGE_DATA.sections[i], PAGE_DATA.sections[t]] =
-    [PAGE_DATA.sections[t], PAGE_DATA.sections[i]];
-  reorder();
-  renderSections();
-  preview();
-}
-
-function reorder() {
-  PAGE_DATA.sections.forEach((s, i) => s.order = i + 1);
-}
-
-function toggleSection(i, val) {
-  PAGE_DATA.sections[i].enabled = val;
-  preview();
-}
-
-function updateTitle(i, val) {
-  PAGE_DATA.sections[i].content.title = val;
-  preview();
-}
-
-function updateSubtitle(i, val) {
-  PAGE_DATA.sections[i].content.subtitle = val;
-  preview();
-}
-
-function updateImage(i, val) {
-  PAGE_DATA.sections[i].media = PAGE_DATA.sections[i].media || {};
-  PAGE_DATA.sections[i].media.url = val;
-  preview();
-}
-
-/* =========================================================
-   PREVIEW
-========================================================= */
 function preview() {
   window.opener?.postMessage({
-    type: 'PREVIEW',
-    data: PAGE_DATA
-  }, '*');
+    type:'PREVIEW',
+    data:PAGE_DATA
+  },'*');
+}
+
+function toggle(i,v){ PAGE_DATA.sections[i].enabled=v; preview(); }
+function updateTitle(i,v){ PAGE_DATA.sections[i].content.title=v; preview(); }
+function updateSubtitle(i,v){ PAGE_DATA.sections[i].content.subtitle=v; preview(); }
+function updateImage(i,v){
+  PAGE_DATA.sections[i].media = PAGE_DATA.sections[i].media||{};
+  PAGE_DATA.sections[i].media.url=v;
+  preview();
+}
+
+function move(i,d){
+  const t=i+d;
+  if(t<0||t>=PAGE_DATA.sections.length) return;
+  [PAGE_DATA.sections[i],PAGE_DATA.sections[t]] =
+    [PAGE_DATA.sections[t],PAGE_DATA.sections[i]];
+  PAGE_DATA.sections.forEach((s,idx)=>s.order=idx+1);
+  renderContent(); preview();
+}
+
+function removeSection(i){
+  if(!confirm('삭제?'))return;
+  PAGE_DATA.sections.splice(i,1);
+  PAGE_DATA.sections.forEach((s,idx)=>s.order=idx+1);
+  renderContent(); preview();
+}
+
+function addSection(){
+  PAGE_DATA.sections.push({
+    id:'section-'+Date.now(),
+    type:'hero',
+    enabled:true,
+    order:PAGE_DATA.sections.length+1,
+    content:{title:'새 섹션',subtitle:''},
+    media:{ratio:'16-9'}
+  });
+  renderContent(); preview();
 }
 
 /* =========================================================
-   SAVE
+   JSON TAB
 ========================================================= */
-function saveContent() {
-  fetch(API_BASE + '/api/content', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + ADMIN_TOKEN
-    },
-    body: JSON.stringify(PAGE_DATA)
-  });
+function renderJSON() {
+  jsonTab.innerHTML = `
+    <h2>Content JSON</h2>
+    <textarea id="jsonEditor" rows="20">
+${JSON.stringify(PAGE_DATA,null,2)}
+    </textarea>
+    <button onclick="applyJSON()">적용</button>
+  `;
 }
 
-function saveTokens() {
-  DESIGN_TOKENS = JSON.parse(tokenEditor.value);
-  fetch(API_BASE + '/api/design/tokens', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + ADMIN_TOKEN
+function applyJSON(){
+  try{
+    PAGE_DATA = JSON.parse(jsonEditor.value);
+    renderContent(); preview();
+  }catch(e){
+    alert('JSON 오류');
+  }
+}
+
+/* =========================================================
+   DESIGN TAB
+========================================================= */
+function renderDesign() {
+  designTab.innerHTML = `
+    <h2>디자인 토큰</h2>
+    <textarea id="designEditor" rows="20">
+${JSON.stringify(DESIGN_TOKENS,null,2)}
+    </textarea>
+    <button class="primary" onclick="saveDesign()">디자인 저장</button>
+
+    <hr/>
+    <h3>버전</h3>
+    ${(DESIGN_META.versions||[]).map(v=>`
+      <div>
+        <strong>${v.id}</strong> (${v.createdAt})
+        ${v.id!==DESIGN_META.current ? `
+          <button onclick="rollback('${v.id}')">롤백</button>
+          <button onclick="deleteVersion('${v.id}')">삭제</button>
+        ` : '<em> (현재)</em>'}
+      </div>
+    `).join('')}
+  `;
+}
+
+function saveDesign(){
+  DESIGN_TOKENS = JSON.parse(designEditor.value);
+  fetch(API+'/api/design/tokens',{
+    method:'POST',
+    headers:{
+      'Authorization':'Bearer '+TOKEN,
+      'Content-Type':'application/json'
     },
-    body: JSON.stringify(DESIGN_TOKENS)
-  });
+    body:JSON.stringify(DESIGN_TOKENS)
+  }).then(()=>loadAll());
+}
+
+function rollback(id){
+  fetch(API+'/api/design/rollback/'+id,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+TOKEN}
+  }).then(()=>loadAll());
+}
+
+function deleteVersion(id){
+  if(!confirm('삭제?'))return;
+  fetch(API+'/api/design/delete/'+id,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+TOKEN}
+  }).then(()=>loadAll());
+}
+
+/* =========================================================
+   SAVE CONTENT
+========================================================= */
+function saveContent(){
+  fetch(API+'/api/content',{
+    method:'POST',
+    headers:{
+      'Authorization':'Bearer '+TOKEN,
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify(PAGE_DATA)
+  }).then(()=>status.textContent='✅ 저장 완료');
 }
 </script>
 
