@@ -20,7 +20,7 @@ body {
   margin-bottom:16px;
   border:1px solid #e5e7eb;
 }
-h1,h2,h3 { margin-top:0; }
+h1,h2,h3,h4 { margin-top:0; }
 button {
   padding:8px 14px;
   cursor:pointer;
@@ -61,19 +61,22 @@ pre { font-size:13px; }
   background:#f5f6f8;
   padding-top:12px;
 }
-.badge {
-  font-size:12px;
-  padding:2px 6px;
+.small {
+  font-size:13px;
+  color:#555;
+}
+.subbox {
+  border:1px dashed #ddd;
+  padding:10px;
+  margin-top:8px;
   border-radius:6px;
-  background:#111;
-  color:#fff;
 }
 </style>
 </head>
 
 <body>
 
-<!-- ================= LOGIN ================= -->
+<!-- LOGIN -->
 <div id="loginBox" class="box">
   <h2>Admin Login</h2>
   <label>ID
@@ -87,7 +90,7 @@ pre { font-size:13px; }
   <pre id="loginStatus"></pre>
 </div>
 
-<!-- ================= ADMIN ================= -->
+<!-- ADMIN -->
 <div id="adminBox" class="hidden">
 
 <h1>Homepage Admin</h1>
@@ -121,44 +124,39 @@ let DESIGN_META = null;
 if (TOKEN) initAdmin();
 else showLogin();
 
-function showLogin() {
-  loginBox.classList.remove('hidden');
-}
-function initAdmin() {
+function showLogin(){ loginBox.classList.remove('hidden'); }
+function initAdmin(){
   loginBox.classList.add('hidden');
   adminBox.classList.remove('hidden');
   loadAll();
 }
 
 /* ================= AUTH ================= */
-function login() {
-  fetch(API + '/api/admin/login', {
+function login(){
+  fetch(API+'/api/admin/login',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      id: loginId.value,
-      password: loginPw.value
-    })
+    body:JSON.stringify({ id:loginId.value, password:loginPw.value })
   })
-  .then(r => r.ok ? r.json() : Promise.reject())
-  .then(res => {
-    TOKEN = res.token;
-    localStorage.setItem('ADMIN_TOKEN', TOKEN);
+  .then(r=>r.ok?r.json():Promise.reject())
+  .then(res=>{
+    TOKEN=res.token;
+    localStorage.setItem('ADMIN_TOKEN',TOKEN);
     initAdmin();
   })
-  .catch(() => loginStatus.textContent='❌ 로그인 실패');
+  .catch(()=>loginStatus.textContent='❌ 로그인 실패');
 }
-function logout() {
+function logout(){
   localStorage.removeItem('ADMIN_TOKEN');
   location.reload();
 }
 
 /* ================= LOAD ================= */
-function loadAll() {
+function loadAll(){
   Promise.all([
-    fetch(API + '/api/content').then(r=>r.json()),
-    fetch(API + '/api/design/tokens').then(r=>r.json()),
-    fetch(API + '/api/design/versions').then(r=>r.json())
+    fetch(API+'/api/content').then(r=>r.json()),
+    fetch(API+'/api/design/tokens').then(r=>r.json()),
+    fetch(API+'/api/design/versions').then(r=>r.json())
   ]).then(([c,t,m])=>{
     PAGE_DATA=c;
     DESIGN_TOKENS=t;
@@ -170,43 +168,28 @@ function loadAll() {
 }
 
 /* ================= TABS ================= */
-function showTab(tab) {
+function showTab(tab){
   ['contentTab','jsonTab','designTab']
     .forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById(tab+'Tab').classList.remove('hidden');
 }
 
+/* ================= PREVIEW ================= */
+function preview(){
+  window.postMessage({ type:'PREVIEW', data:PAGE_DATA },'*');
+}
+
 /* ================= CONTENT ================= */
-function renderContent() {
+function renderContent(){
   contentTab.innerHTML = `
     <h2>콘텐츠 관리</h2>
 
     ${PAGE_DATA.sections.map((s,i)=>`
       <div class="section-item">
-        <strong>${s.type.toUpperCase()}</strong>
+        <h3>${s.type.toUpperCase()}</h3>
 
-        <label>
-          활성
-          <input type="checkbox" ${s.enabled?'checked':''}
-            onchange="toggle(${i},this.checked)">
-        </label>
-
-        <label>제목
-          <input value="${s.content?.title||''}"
-            oninput="updateTitle(${i},this.value)">
-        </label>
-
-        ${s.content?.subtitle !== undefined ? `
-        <label>부제목
-          <input value="${s.content.subtitle||''}"
-            oninput="updateSubtitle(${i},this.value)">
-        </label>` : ''}
-
-        <div class="row">
-          <button onclick="move(${i},-1)">▲</button>
-          <button onclick="move(${i},1)">▼</button>
-          <button class="danger" onclick="removeSection(${i})">삭제</button>
-        </div>
+        ${renderCommonUI(s,i)}
+        ${renderTypeUI(s,i)}
       </div>
     `).join('')}
 
@@ -218,51 +201,184 @@ function renderContent() {
   `;
 }
 
-function preview() {
-  window.postMessage({ type:'PREVIEW', data:PAGE_DATA }, '*');
+function renderCommonUI(s,i){
+  return `
+    <label>
+      활성
+      <input type="checkbox" ${s.enabled?'checked':''}
+        onchange="PAGE_DATA.sections[${i}].enabled=this.checked;preview()">
+    </label>
+
+    <label>제목
+      <input value="${s.content?.title||''}"
+        oninput="PAGE_DATA.sections[${i}].content.title=this.value;preview()">
+    </label>
+
+    <div class="row">
+      <button onclick="move(${i},-1)">▲</button>
+      <button onclick="move(${i},1)">▼</button>
+      <button class="danger" onclick="removeSection(${i})">삭제</button>
+    </div>
+  `;
 }
 
-function toggle(i,v){ PAGE_DATA.sections[i].enabled=v; preview(); }
-function updateTitle(i,v){ PAGE_DATA.sections[i].content.title=v; preview(); }
-function updateSubtitle(i,v){ PAGE_DATA.sections[i].content.subtitle=v; preview(); }
+/* ================= TYPE UI ================= */
+function renderTypeUI(s,i){
+  switch(s.type){
 
+    case 'hero':
+      return `
+        <label>부제목
+          <input value="${s.content?.subtitle||''}"
+            oninput="s.content.subtitle=this.value;preview()">
+        </label>
+
+        <label>미디어 비율
+          <select onchange="s.media.ratio=this.value;preview()">
+            <option ${s.media?.ratio==='16-9'?'selected':''}>16-9</option>
+            <option ${s.media?.ratio==='4-3'?'selected':''}>4-3</option>
+            <option ${s.media?.ratio==='1-1'?'selected':''}>1-1</option>
+          </select>
+        </label>
+      `;
+
+    case 'cards':
+      s.options = s.options||{};
+      s.options.layout = s.options.layout||'grid';
+      s.options.slider = s.options.slider||{autoplay:false,interval:4000};
+      s.content.items = s.content.items||[];
+
+      return `
+        <label>레이아웃
+          <select onchange="s.options.layout=this.value;renderContent();preview()">
+            <option value="grid" ${s.options.layout==='grid'?'selected':''}>Grid</option>
+            <option value="slider" ${s.options.layout==='slider'?'selected':''}>Slider</option>
+          </select>
+        </label>
+
+        ${s.options.layout==='slider' ? `
+          <label>
+            자동 재생
+            <input type="checkbox" ${s.options.slider.autoplay?'checked':''}
+              onchange="s.options.slider.autoplay=this.checked;preview()">
+          </label>
+          <label>간격(ms)
+            <input type="number" value="${s.options.slider.interval}"
+              onchange="s.options.slider.interval=Number(this.value);preview()">
+          </label>
+        `:''}
+
+        <h4>카드</h4>
+        ${s.content.items.map((c,ci)=>`
+          <div class="subbox">
+            <input placeholder="제목" value="${c.title||''}"
+              oninput="c.title=this.value;preview()">
+            <input placeholder="설명" value="${c.desc||''}"
+              oninput="c.desc=this.value;preview()">
+            <button onclick="removeItem(${i},${ci})">삭제</button>
+          </div>
+        `).join('')}
+        <button onclick="addItem(${i},{title:'',desc:''})">+ 카드 추가</button>
+      `;
+
+    case 'list':
+    case 'faq':
+      s.content.items = s.content.items||[];
+      return `
+        <h4>${s.type==='faq'?'Q / A':'항목'}</h4>
+        ${s.content.items.map((it,ii)=>`
+          <div class="subbox">
+            <input placeholder="${s.type==='faq'?'질문':'항목'}"
+              value="${it.q||it||''}"
+              oninput="${s.type==='faq'?'it.q=this.value':'s.content.items['+ii+']=this.value'};preview()">
+            ${s.type==='faq'?`
+            <input placeholder="답변"
+              value="${it.a||''}"
+              oninput="it.a=this.value;preview()">`:''}
+            <button onclick="removeItem(${i},${ii})">삭제</button>
+          </div>
+        `).join('')}
+        <button onclick="addItem(${i},${s.type==='faq'?"{q:'',a:''}":"'"} )">+ 추가</button>
+      `;
+
+    case 'pricing':
+      s.content.items = s.content.items||[];
+      return `
+        <h4>요금제</h4>
+        ${s.content.items.map((p,pi)=>`
+          <div class="subbox">
+            <input placeholder="이름" value="${p.name||''}"
+              oninput="p.name=this.value;preview()">
+            <input placeholder="가격" value="${p.price||''}"
+              oninput="p.price=this.value;preview()">
+            <input placeholder="설명" value="${p.desc||''}"
+              oninput="p.desc=this.value;preview()">
+            <button onclick="removeItem(${i},${pi})">삭제</button>
+          </div>
+        `).join('')}
+        <button onclick="addItem(${i},{name:'',price:'',desc:''})">+ 요금제 추가</button>
+      `;
+
+    case 'cta':
+      s.content.button = s.content.button||{label:'',action:''};
+      return `
+        <label>버튼 텍스트
+          <input value="${s.content.button.label}"
+            oninput="s.content.button.label=this.value;preview()">
+        </label>
+        <label>버튼 링크
+          <input value="${s.content.button.action}"
+            oninput="s.content.button.action=this.value;preview()">
+        </label>
+      `;
+  }
+  return '';
+}
+
+/* ================= ITEM HELPERS ================= */
+function addItem(si,obj){
+  PAGE_DATA.sections[si].content.items.push(obj);
+  renderContent(); preview();
+}
+function removeItem(si,ii){
+  PAGE_DATA.sections[si].content.items.splice(ii,1);
+  renderContent(); preview();
+}
+
+/* ================= SECTION HELPERS ================= */
 function move(i,d){
   const t=i+d;
-  if(t<0||t>=PAGE_DATA.sections.length) return;
-  [PAGE_DATA.sections[i],PAGE_DATA.sections[t]] =
+  if(t<0||t>=PAGE_DATA.sections.length)return;
+  [PAGE_DATA.sections[i],PAGE_DATA.sections[t]]=
     [PAGE_DATA.sections[t],PAGE_DATA.sections[i]];
   PAGE_DATA.sections.forEach((s,idx)=>s.order=idx+1);
   renderContent(); preview();
 }
-
 function removeSection(i){
-  if(!confirm('이 섹션을 삭제하시겠습니까?'))return;
+  if(!confirm('이 섹션을 삭제할까요?'))return;
   PAGE_DATA.sections.splice(i,1);
   PAGE_DATA.sections.forEach((s,idx)=>s.order=idx+1);
   renderContent(); preview();
 }
-
 function addSection(){
-  const type = prompt('섹션 타입 (hero, cards, list, cta, faq, pricing)');
-  if(!type) return;
+  const type=prompt('섹션 타입 (hero,cards,list,faq,pricing,cta)');
+  if(!type)return;
   PAGE_DATA.sections.push({
     id:'section-'+Date.now(),
     type,
     enabled:true,
     order:PAGE_DATA.sections.length+1,
-    content:{ title:'새 섹션' },
+    content:{title:'새 섹션',items:[]},
     options:{},
-    media:{ ratio:'16-9' }
+    media:{ratio:'16-9'}
   });
   renderContent(); preview();
 }
 
-/* ================= SAVE CONTENT ================= */
+/* ================= SAVE ================= */
 function saveContent(){
-  if(!confirm('콘텐츠를 저장하시겠습니까?')) return;
-
-  status.textContent = '저장 중입니다...';
-
+  if(!confirm('콘텐츠를 저장하시겠습니까?'))return;
+  status.textContent='저장 중입니다...';
   fetch(API+'/api/content',{
     method:'POST',
     headers:{
@@ -276,55 +392,33 @@ function saveContent(){
 }
 
 /* ================= JSON ================= */
-function renderJSON() {
-  jsonTab.innerHTML = `
+function renderJSON(){
+  jsonTab.innerHTML=`
     <h2>Content JSON</h2>
-    <textarea id="jsonEditor" rows="22">
+    <textarea rows="22" id="jsonEditor">
 ${JSON.stringify(PAGE_DATA,null,2)}
     </textarea>
-    <button onclick="applyJSON()">JSON 적용</button>
-        <div class="footer-save">
-      <button class="primary" onclick="saveContent()">저장하기</button>
-    </div>
+    <button onclick="applyJSON()">적용</button>
   `;
 }
-
 function applyJSON(){
   try{
-    PAGE_DATA = JSON.parse(jsonEditor.value);
+    PAGE_DATA=JSON.parse(jsonEditor.value);
     renderContent(); preview();
-  }catch{
-    alert('JSON 오류');
-  }
+  }catch{ alert('JSON 오류'); }
 }
 
 /* ================= DESIGN ================= */
-function renderDesign() {
-  designTab.innerHTML = `
+function renderDesign(){
+  designTab.innerHTML=`
     <h2>디자인 토큰</h2>
-    <textarea id="designEditor" rows="20">
+    <textarea rows="20" id="designEditor">
 ${JSON.stringify(DESIGN_TOKENS,null,2)}
     </textarea>
     <button class="primary" onclick="saveDesign()">디자인 저장</button>
-
-    <hr/>
-    <h3>버전</h3>
-    ${(DESIGN_META.versions||[]).map(v=>`
-      <div>
-        <strong>${v.id}</strong>
-        ${v.id===DESIGN_META.current ? '<span class="badge">현재</span>' : ''}
-        (${v.createdAt})
-        ${v.id!==DESIGN_META.current ? `
-          <button onclick="rollback('${v.id}')">롤백</button>
-          <button onclick="deleteVersion('${v.id}')">삭제</button>
-        ` : ''}
-      </div>
-    `).join('')}
   `;
 }
-
 function saveDesign(){
-  if(!confirm('디자인을 저장하시겠습니까?')) return;
   fetch(API+'/api/design/tokens',{
     method:'POST',
     headers:{
@@ -332,22 +426,6 @@ function saveDesign(){
       'Content-Type':'application/json'
     },
     body:JSON.stringify(JSON.parse(designEditor.value))
-  }).then(()=>loadAll());
-}
-
-function rollback(id){
-  if(!confirm(id+'로 롤백할까요?')) return;
-  fetch(API+'/api/design/rollback/'+id,{
-    method:'POST',
-    headers:{'Authorization':'Bearer '+TOKEN}
-  }).then(()=>loadAll());
-}
-
-function deleteVersion(id){
-  if(!confirm('이 버전을 삭제할까요?')) return;
-  fetch(API+'/api/design/delete/'+id,{
-    method:'POST',
-    headers:{'Authorization':'Bearer '+TOKEN}
   }).then(()=>loadAll());
 }
 </script>
